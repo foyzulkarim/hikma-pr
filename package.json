@@ -1,0 +1,42 @@
+{
+  "name": "hikma-pr",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev --name init",
+    "prisma:studio": "prisma studio"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foyzulkarim/hikma-pr.git"
+  },
+  "bin": {
+    "hikma-pr": "./dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/foyzulkarim/hikma-pr/issues"
+  },
+  "homepage": "https://github.com/foyzulkarim/hikma-pr#readme",
+  "dependencies": {
+    "@langchain/langgraph": "^0.3.4",
+    "@prisma/client": "^6.10.0",
+    "chalk": "^5.4.1",
+    "commander": "^14.0.0",
+    "octokit": "^5.0.3",
+    "ollama-node": "^0.1.28",
+    "ora": "^8.2.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "prisma": "^6.10.0"
+  }
+}

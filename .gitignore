@@ -134,3 +134,13 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Database files - should never be committed
+*.db
+*.sqlite
+*.sqlite3
+reviews.db
+hikmapr.db
+
+# Prisma
+prisma/dev.db
