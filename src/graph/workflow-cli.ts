@@ -1,16 +1,13 @@
 /**
- * LangGraph Workflow Definition
- * * This file defines the stateful graph that orchestrates the PR review process.
- * It includes the state definition, nodes for each step, and the conditional
- * logic that controls the flow.
+ * LangGraph CLI-based Workflow Definition
+ * 
+ * This file defines the stateful graph that orchestrates the PR review process
+ * using gh CLI instead of GitHub API to avoid rate limiting issues.
  */
 
 import { StateGraph, END } from "@langchain/langgraph";
-import { getPrDetails } from '../services/githubService';
-import { getChangedFiles } from '../services/githubService';
-import { analyzeFile } from '../services/llmService';
-import { synthesizeReport } from '../services/llmService';
-import { Octokit } from 'octokit';
+import { getPrDetailsViaCli, getChangedFilesViaCli } from '../services/githubService';
+import { analyzeFileViaCli, synthesizeReport } from '../services/llmService';
 import chalk from 'chalk';
 
 // Define the state shape that flows through the graph
@@ -26,9 +23,7 @@ interface ReviewState {
   final_report?: string;
 }
 
-// Service clients that will be passed to the nodes
-const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-// No LLM client needed here - llmService manages its own client internally
+// No service clients needed - llmService manages its own client internally
 
 /**
  * Defines the conditional router that checks if there are more files to review.
@@ -61,7 +56,7 @@ const routeAfterAnalysis = (state: ReviewState) => {
 };
 
 // Create a new state graph
-const workflow = new StateGraph<ReviewState>({
+const workflowCli = new StateGraph<ReviewState>({
   channels: {
     pr_url: { value: (x: any, y: any) => y, default: () => "" },
     task_id: { value: (x: any, y: any) => y, default: () => "" },
@@ -80,24 +75,22 @@ const workflow = new StateGraph<ReviewState>({
 });
 
 // Add nodes to the graph
-workflow.addNode("getPrDetails", async (state: ReviewState) => {
-  console.log(chalk.bold.blue(`\n🏃 Executing Node: getPrDetails (GitHub SDK)`));
-  
-  const details = await getPrDetails(octokit, state.pr_url);
+workflowCli.addNode("getPrDetails", async (state: ReviewState) => {
+  console.log(chalk.bold.blue(`\n🏃 Executing Node: getPrDetails (GitHub CLI)`));
+  const details = await getPrDetailsViaCli(state.pr_url);
   console.log(chalk.green(`✅ Node getPrDetails completed`));
   return { pr_details: details };
 });
 
-workflow.addNode("getChangedFiles", async (state: ReviewState) => {
-  console.log(chalk.bold.blue(`\n🏃 Executing Node: getChangedFiles (GitHub SDK)`));
-  
-  const files = await getChangedFiles(octokit, state.pr_url);
+workflowCli.addNode("getChangedFiles", async (state: ReviewState) => {
+  console.log(chalk.bold.blue(`\n🏃 Executing Node: getChangedFiles (GitHub CLI)`));
+  const files = await getChangedFilesViaCli(state.pr_url);
   console.log(chalk.green(`✅ Node getChangedFiles completed`));
   return { files_to_review: files };
 });
 
-workflow.addNode("analyzeFile", async (state: ReviewState) => {
-  console.log(chalk.bold.blue(`\n🏃 Executing Node: analyzeFile (GitHub SDK)`));
+workflowCli.addNode("analyzeFile", async (state: ReviewState) => {
+  console.log(chalk.bold.blue(`\n🏃 Executing Node: analyzeFile (GitHub CLI)`));
   
   if (!state.files_to_review || state.files_to_review.length === 0) {
     console.log(chalk.yellow(`⚠️  No files to analyze`));
@@ -112,7 +105,7 @@ workflow.addNode("analyzeFile", async (state: ReviewState) => {
   console.log(chalk.blue(`📋 Files remaining after this: ${remainingFiles.length}`));
   
   try {
-    const analysis = await analyzeFile(octokit, state.pr_url, fileToReview);
+    const analysis = await analyzeFileViaCli(state.pr_url, fileToReview);
     console.log(chalk.green(`✅ Node analyzeFile completed for ${fileToReview}`));
     
     const result = { 
@@ -124,9 +117,9 @@ workflow.addNode("analyzeFile", async (state: ReviewState) => {
     console.log(chalk.gray(`📋 Current state: ${Object.keys(state.analyzed_files || {}).length} files already analyzed`));
     
     return result;
-  } catch (error: any) {
+  } catch (error) {
     console.error(chalk.red(`❌ Error in analyzeFile node for ${fileToReview}:`), error);
-    // Return a default analysis if errors occur
+    // Return a default analysis if LLM fails
     const errorAnalysis = `Error analyzing file: ${error}`;
     
     const result = { 
@@ -140,7 +133,7 @@ workflow.addNode("analyzeFile", async (state: ReviewState) => {
   }
 });
 
-workflow.addNode("synthesizeReport", async (state: ReviewState) => {
+workflowCli.addNode("synthesizeReport", async (state: ReviewState) => {
   console.log(chalk.bold.blue(`\n🏃 Executing Node: synthesizeReport`));
   
   // Debug: Check what files we have in state
@@ -180,9 +173,9 @@ ${Object.entries(analyzedFiles).map(([file, analysis]) =>
 });
 
 // Set up the graph's flow
-(workflow as any).setEntryPoint("getPrDetails");
-(workflow as any).addEdge("getPrDetails", "getChangedFiles");
-(workflow as any).addConditionalEdges(
+(workflowCli as any).setEntryPoint("getPrDetails");
+(workflowCli as any).addEdge("getPrDetails", "getChangedFiles");
+(workflowCli as any).addConditionalEdges(
   "getChangedFiles",
   shouldContinue,
   {
@@ -190,7 +183,7 @@ ${Object.entries(analyzedFiles).map(([file, analysis]) =>
     "synthesizeReport": "synthesizeReport"
   }
 );
-(workflow as any).addConditionalEdges(
+(workflowCli as any).addConditionalEdges(
   "analyzeFile",
   routeAfterAnalysis,
   {
@@ -198,19 +191,19 @@ ${Object.entries(analyzedFiles).map(([file, analysis]) =>
     "synthesizeReport": "synthesizeReport"
   }
 );
-(workflow as any).addEdge("synthesizeReport", END);
+(workflowCli as any).addEdge("synthesizeReport", END);
 
-export const app = workflow.compile({
+export const appCli = workflowCli.compile({
   checkpointer: undefined, // No checkpointing needed for simple workflows
 });
 
 // Configure with higher recursion limit to handle large number of files
-export const getAppWithConfig = () => {
+export const getCliAppWithConfig = () => {
   return {
-    app,
+    app: appCli,
     config: {
       recursionLimit: 100, // Increase from default 25 to handle more files
       maxSteps: 1000,     // Maximum number of steps to prevent infinite loops
     }
   };
-};
+}; 

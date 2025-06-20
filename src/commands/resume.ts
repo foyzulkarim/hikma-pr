@@ -2,11 +2,13 @@
  * Handler for the 'resume' command.
  */
 import { PrismaClient } from '@prisma/client';
-import { app } from '../graph/workflow';
+import { app as sdkWorkflow } from '../graph/workflow';
+import { appCli as cliWorkflow } from '../graph/workflow-cli';
+import { GitHubMethod } from '../index';
 import ora from 'ora';
 import chalk from 'chalk';
 
-export const resumeCommandHandler = async (taskId: string, prisma: PrismaClient) => {
+export const resumeCommandHandler = async (taskId: string, prisma: PrismaClient, githubMethod: GitHubMethod) => {
   const spinner = ora(`Resuming hikmapr Review [ID: ${taskId}]...`).start();
   
   const review = await prisma.review.findUnique({
@@ -17,6 +19,15 @@ export const resumeCommandHandler = async (taskId: string, prisma: PrismaClient)
     spinner.fail(chalk.red(`Error: No review found with ID ${taskId}`));
     process.exit(1);
   }
+
+  // Choose the appropriate workflow based on GitHub method
+  const app = githubMethod === 'cli' ? cliWorkflow : sdkWorkflow;
+  
+  const methodInfo = githubMethod === 'cli' 
+    ? 'Using GitHub CLI (gh)'
+    : 'Using GitHub SDK (Octokit)';
+  
+  console.log(chalk.gray(`🔧 ${methodInfo} for resume operation`));
 
   const config = {
     configurable: {

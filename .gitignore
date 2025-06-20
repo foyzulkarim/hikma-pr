@@ -144,3 +144,9 @@ hikmapr.db
 
 # Prisma
 prisma/dev.db
+
+# Generated reports
+reports/
+# Keep examples directory but ignore temporary files
+examples/temp*
+examples/*.log

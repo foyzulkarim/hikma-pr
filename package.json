@@ -10,6 +10,7 @@
     "dev": "ts-node src/index.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
+    "prisma:reset": "prisma migrate reset",
     "prisma:studio": "prisma studio"
   },
   "repository": {
@@ -29,14 +30,17 @@
   "dependencies": {
     "@langchain/langgraph": "^0.3.4",
     "@prisma/client": "^6.10.0",
+    "axios": "^1.7.7",
     "chalk": "^5.4.1",
     "commander": "^14.0.0",
     "octokit": "^5.0.3",
-    "ollama-node": "^0.1.28",
     "ora": "^8.2.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "prisma": "^6.10.0"
+    "@types/node": "^24.0.3",
+    "prisma": "^6.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
   }
 }
