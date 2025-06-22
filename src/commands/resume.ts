@@ -2,8 +2,7 @@
  * Handler for the 'resume' command.
  */
 import { PrismaClient } from '@prisma/client';
-import { app as sdkWorkflow } from '../graph/workflow';
-import { appCli as cliWorkflow } from '../graph/workflow-cli';
+import { getAppWithConfig } from '../graph/workflow';
 import { GitHubMethod } from '../index';
 import ora from 'ora';
 import chalk from 'chalk';
@@ -20,19 +19,17 @@ export const resumeCommandHandler = async (taskId: string, prisma: PrismaClient,
     process.exit(1);
   }
 
-  // Choose the appropriate workflow based on GitHub method
-  const app = githubMethod === 'cli' ? cliWorkflow : sdkWorkflow;
+  // Use the advanced multi-pass analysis workflow  
+  const { app, config: workflowConfig } = getAppWithConfig();
   
-  const methodInfo = githubMethod === 'cli' 
-    ? 'Using GitHub CLI (gh)'
-    : 'Using GitHub SDK (Octokit)';
-  
-  console.log(chalk.gray(`🔧 ${methodInfo} for resume operation`));
+  console.log(chalk.gray(`🔬 Using Multi-Pass Analysis architecture for resume operation`));
+  console.log(chalk.gray(`🔧 Workflow configured with recursion limit: ${workflowConfig.recursionLimit}`));
 
   const config = {
     configurable: {
       thread_id: taskId,
     },
+    ...workflowConfig, // Apply the workflow configuration
   };
 
   const initialState = review.state as any;

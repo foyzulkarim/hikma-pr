@@ -6,6 +6,20 @@ export async function GET() {
     const reviews = await prisma.review.findMany({
       orderBy: {
         createdAt: 'desc'
+      },
+      include: {
+        fileAnalyses: true,
+        chunkAnalyses: {
+          include: {
+            analysisPasses: true
+          }
+        },
+        _count: {
+          select: {
+            chunkAnalyses: true,
+            analysisPasses: true
+          }
+        }
       }
     })
     

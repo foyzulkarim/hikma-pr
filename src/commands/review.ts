@@ -1,9 +1,8 @@
 /**
- * Handler for the 'review' command.
+ * Handler for the 'review' command - now supports both V1 and V2 workflows.
  */
 import { PrismaClient } from '@prisma/client';
 import { getAppWithConfig } from '../graph/workflow';
-import { getCliAppWithConfig } from '../graph/workflow-cli';
 import { GitHubMethod } from '../index';
 import { v4 as uuidv4 } from 'uuid';
 import ora from 'ora';
@@ -107,19 +106,17 @@ const saveMarkdownReport = (markdown: string, prUrl: string, taskId: string): st
 
 export const reviewCommandHandler = async (prUrl: string, prisma: PrismaClient, githubMethod: GitHubMethod) => {
   const taskId = uuidv4();
-  console.log(chalk.bold.cyan(`\n🚀 Starting hikmapr Review`));
+  console.log(chalk.bold.cyan(`\n🚀 Starting Hikmapr Multi-Pass Analysis`));
   console.log(chalk.blue(`📝 Task ID: ${chalk.yellow(taskId)}`));
   console.log(chalk.blue(`🔗 PR URL: ${chalk.yellow(prUrl)}`));
-  console.log(chalk.blue(`🔧 GitHub Method: ${chalk.yellow(githubMethod.toUpperCase())}`));
+  console.log(chalk.blue(`🔬 Using Advanced Multi-Pass Analysis Architecture`));
 
-  // Choose the appropriate workflow based on GitHub method with proper configuration
-  const { app, config: workflowConfig } = githubMethod === 'cli' ? getCliAppWithConfig() : getAppWithConfig();
+  // Use the advanced multi-pass analysis workflow
+  const { app, config: workflowConfig } = getAppWithConfig();
   
-  const methodInfo = githubMethod === 'cli' 
-    ? '🔧 Using GitHub CLI (gh) - no rate limits, requires gh authentication'
-    : '🔧 Using GitHub SDK (Octokit) - requires GITHUB_TOKEN, subject to rate limits';
-  
+  const methodInfo = '🔬 Multi-Pass Analysis: 4 specialized passes per chunk with hierarchical synthesis';
   console.log(chalk.gray(methodInfo));
+  console.log(chalk.gray(`📋 Smart filtering → Recursive chunking → 4-pass analysis → Synthesis`));
   console.log(chalk.gray(`🔧 Workflow configured with recursion limit: ${workflowConfig.recursionLimit}`));
 
   const config = {
