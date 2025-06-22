@@ -36,6 +36,11 @@ Before you start, ensure you have these installed:
 2. **GitHub CLI (gh)** - [Installation guide](https://cli.github.com/)
 3. **Ollama** - [Download here](https://ollama.ai/) (for local LLM)
 
+
+### Video demo
+
+[![My Awesome Video](https://img.youtube.com/vi/5dSYV0jQpTU/hqdefault.jpg)](https://youtu.be/5dSYV0jQpTU)
+
 ### **Setup Steps**
 
 #### 1. Install and Configure GitHub CLI
