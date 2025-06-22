@@ -73,6 +73,36 @@ gh auth status
 ollama list
 ```
 
+## 🔧 Configuration
+
+### **LLM Models**
+Configure in `src/graph/workflow.ts`:
+
+```typescript
+const DEFAULT_CONFIG: AnalysisConfig = {
+  models: {
+    syntax_logic: { name: 'gemma2:2b', provider: 'ollama' },
+    security_performance: { name: 'gemma2:2b', provider: 'ollama' },
+    architecture_design: { name: 'gemma2:2b', provider: 'ollama' },
+    testing_docs: { name: 'gemma2:2b', provider: 'ollama' }
+  }
+}
+```
+
+### **Supported Models**
+- **Ollama**: `gemma2:2b`, `gemma2:1b`, `llama3.1:8b`, `codellama:7b`
+- **OpenAI**: `gpt-4`, `gpt-3.5-turbo` (requires API key)
+- **Anthropic**: `claude-3-sonnet` (requires API key)
+
+### **Project Detection**
+Automatically detects and filters files for:
+- **JavaScript/TypeScript**: React, Next.js, Node.js, Vue, Angular
+- **Python**: Django, Flask, FastAPI, general Python
+- **Java**: Spring Boot, Maven, Gradle projects
+- **Go**: Go modules and packages
+- **C#**: .NET, ASP.NET projects
+- **PHP**: Laravel, Symfony projects
+
 ## 📋 Installation & Quick Start
 
 ### **Step 1: Clone and Install**
@@ -135,67 +165,6 @@ hikma reports view 1
 hikma resume abc123def
 ```
 
-## 🏗️ Architecture
-
-### Efficient Data Flow
-1. **Single Fetch**: `gh pr diff <URL>` - one API call for entire PR
-2. **Smart Filter**: Auto-detect project type, filter relevant files
-3. **Local Extract**: Extract individual file diffs from cached full diff
-4. **Chunk & Analyze**: 4-pass analysis per chunk with streaming
-5. **Synthesize**: Hierarchical synthesis from chunks → files → PR
-
-### No Rate Limiting Issues
-- ✅ **One API call** per PR analysis
-- ✅ **Local processing** for all file operations  
-- ✅ **gh CLI** integration (no environment variables needed)
-- ❌ No multiple calls per file
-- ❌ No API key management
-
-## 🔧 Configuration
-
-### LLM Models
-Configure in `src/graph/workflow.ts`:
-
-```typescript
-const DEFAULT_CONFIG: AnalysisConfig = {
-  models: {
-    syntax_logic: { name: 'gemma3:1b', provider: 'ollama' },
-    security_performance: { name: 'gemma3:1b', provider: 'ollama' },
-    // ... other passes
-  }
-}
-```
-
-### Project Detection
-Supports auto-detection for:
-- TypeScript/JavaScript (Node.js, React, Next.js)
-- Python (Django, Flask, FastAPI)
-- Java (Spring, Maven, Gradle)
-- Go modules
-
-## 🛠️ Development Scripts
-
-Quick reference for development tasks:
-
-```bash
-# Show all available scripts with descriptions
-npm run help
-
-# Development workflow
-npm run dev          # Run in development mode (hot reload)
-npm run build        # Build TypeScript to JavaScript
-npm start           # Run the built application
-
-# Database management
-npm run db:generate  # Generate Prisma client after schema changes
-npm run db:migrate   # Create and apply new migration
-npm run db:deploy    # Apply existing migrations (production)
-npm run db:studio    # Open database GUI
-npm run db:status    # Check migration status
-```
-
-For detailed explanations of each script, see [SCRIPTS.md](./SCRIPTS.md) or run `npm run help`.
-
 ## 📊 Example Output
 
 ```bash
@@ -229,36 +198,6 @@ For detailed explanations of each script, see [SCRIPTS.md](./SCRIPTS.md) or run 
 📄 Report saved: reports/owner-repo-PR123-2024-01-15-abc123def.md
 🌐 View in dashboard: http://localhost:3000/review/abc123def
 ```
-
-## 🔧 Configuration
-
-### **LLM Models**
-Configure in `src/graph/workflow.ts`:
-
-```typescript
-const DEFAULT_CONFIG: AnalysisConfig = {
-  models: {
-    syntax_logic: { name: 'gemma2:2b', provider: 'ollama' },
-    security_performance: { name: 'gemma2:2b', provider: 'ollama' },
-    architecture_design: { name: 'gemma2:2b', provider: 'ollama' },
-    testing_docs: { name: 'gemma2:2b', provider: 'ollama' }
-  }
-}
-```
-
-### **Supported Models**
-- **Ollama**: `gemma2:2b`, `gemma2:1b`, `llama3.1:8b`, `codellama:7b`
-- **OpenAI**: `gpt-4`, `gpt-3.5-turbo` (requires API key)
-- **Anthropic**: `claude-3-sonnet` (requires API key)
-
-### **Project Detection**
-Automatically detects and filters files for:
-- **JavaScript/TypeScript**: React, Next.js, Node.js, Vue, Angular
-- **Python**: Django, Flask, FastAPI, general Python
-- **Java**: Spring Boot, Maven, Gradle projects
-- **Go**: Go modules and packages
-- **C#**: .NET, ASP.NET projects
-- **PHP**: Laravel, Symfony projects
 
 ## 🛠️ Development Scripts
 
