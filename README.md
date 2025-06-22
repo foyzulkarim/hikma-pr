@@ -89,11 +89,6 @@ const DEFAULT_CONFIG: AnalysisConfig = {
 }
 ```
 
-### **Supported Models**
-- **Ollama**: `gemma2:2b`, `gemma2:1b`, `llama3.1:8b`, `codellama:7b`
-- **OpenAI**: `gpt-4`, `gpt-3.5-turbo` (requires API key)
-- **Anthropic**: `claude-3-sonnet` (requires API key)
-
 ### **Project Detection**
 Automatically detects and filters files for:
 - **JavaScript/TypeScript**: React, Next.js, Node.js, Vue, Angular
@@ -121,11 +116,11 @@ npm run db:migrate
 ### **Step 2: First Analysis**
 ```bash
 # Analyze any public GitHub PR
-npm run dev -- review https://github.com/microsoft/vscode/pull/12345
+npm run dev -- review https://github.com/foyzulkarim/hikma/pull/1
 
 # Or build and run
 npm run build
-npm start review https://github.com/microsoft/vscode/pull/12345
+npm start review https://github.com/foyzulkarim/hikma/pull/1
 ```
 
 ### **Step 3: Launch Web Dashboard (Optional)**
@@ -133,37 +128,18 @@ npm start review https://github.com/microsoft/vscode/pull/12345
 # In a new terminal window
 cd hikma-pr-gui
 npm install
+
+# Set up database (sync schema and generate Prisma client)
+npm run db:generate
+
+# Start the development server
 npm run dev
 
 # Visit http://localhost:3000 to see the dashboard
 ```
 
-## 🎯 Usage Examples
+> **Note:** If you encounter database errors, see [hikma-pr-gui/DATABASE.md](./hikma-pr-gui/DATABASE.md) for detailed setup instructions.
 
-### **Analyze a Pull Request**
-```bash
-# Basic analysis
-hikma review https://github.com/owner/repo/pull/123
-
-# The tool will:
-# 1. Fetch PR diff using GitHub CLI
-# 2. Filter relevant files automatically
-# 3. Run 4-pass analysis on each chunk
-# 4. Generate comprehensive report
-# 5. Save results to database
-```
-
-### **View Results**
-```bash
-# List all analysis reports
-hikma reports list
-
-# View specific report
-hikma reports view 1
-
-# Resume interrupted analysis
-hikma resume abc123def
-```
 
 ## 📊 Example Output
 
@@ -230,36 +206,6 @@ Tracks comprehensive analysis data:
 - **AnalysisPass**: All 4 passes per chunk with risk levels
 - **FileAnalysis**: Legacy file-level analyses
 
-## 📝 Available Commands
-
-```bash
-# Core commands
-hikma review <PR_URL>              # Analyze PR with multi-pass
-hikma resume <task-id>             # Resume interrupted analysis
-
-# Report management  
-hikma reports list                 # List all saved reports
-hikma reports view <number>        # View report by number
-hikma reports view <filename>      # View report by filename
-hikma reports files <task-id>      # View individual file analyses
-hikma reports clean --days 30      # Clean old reports
-```
-
-## 🏗️ Architecture
-
-### Efficient Data Flow
-1. **Single Fetch**: `gh pr diff <URL>` - one API call for entire PR
-2. **Smart Filter**: Auto-detect project type, filter relevant files
-3. **Local Extract**: Extract individual file diffs from cached full diff
-4. **Chunk & Analyze**: 4-pass analysis per chunk with streaming
-5. **Synthesize**: Hierarchical synthesis from chunks → files → PR
-
-### No Rate Limiting Issues
-- ✅ **One API call** per PR analysis
-- ✅ **Local processing** for all file operations  
-- ✅ **gh CLI** integration (no environment variables needed)
-- ❌ No multiple calls per file
-- ❌ No API key management
 
 ## 🚨 Troubleshooting
 
