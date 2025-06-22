@@ -19,8 +19,8 @@ model Review {
   updatedAt  DateTime @updatedAt
   
   // Relationships
-  fileAnalyses  FileAnalysis[]
-  chunkAnalyses ChunkAnalysis[]
+  fileAnalyses   FileAnalysis[]
+  chunkAnalyses  ChunkAnalysis[]
   analysisPasses AnalysisPass[]
 }
 
@@ -39,47 +39,42 @@ model FileAnalysis {
   @@unique([reviewId, fileName]) // Ensure one analysis per file per review
 }
 
+// New models for enhanced multi-pass analysis tracking
 model ChunkAnalysis {
-  id              String   @id @default(cuid())
-  reviewId        String   // Foreign key to Review
-  chunkId         String   // Unique identifier for the chunk
-  filePath        String   // Path of the file this chunk belongs to
-  startLine       Int?     // Starting line number (optional)
-  endLine         Int?     // Ending line number (optional)
-  sizeTokens      Int      // Estimated token count for this chunk
-  diffContent     String   // The actual diff content for this chunk
-  isCompleteFile  Boolean  @default(false) // Whether this chunk represents the entire file
-  contextBefore   String?  // Context from previous chunks (optional)
-  contextAfter    String?  // Context for next chunks (optional)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(cuid())
+  reviewId       String
+  chunkId        String   @unique // UUID for the chunk
+  filePath       String
+  startLine      Int?
+  endLine        Int?
+  sizeTokens     Int
+  diffContent    String
+  isCompleteFile Boolean  @default(false)
+  contextBefore  String?
+  contextAfter   String?
+  createdAt      DateTime @default(now())
   
-  // Relationship to review
-  review          Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  
-  // Relationship to analysis passes
-  analysisPasses  AnalysisPass[]
-  
-  @@unique([reviewId, chunkId]) // Ensure one chunk record per review
+  // Relationships
+  review         Review        @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  analysisPasses AnalysisPass[]
 }
 
 model AnalysisPass {
   id              String   @id @default(cuid())
-  reviewId        String   // Foreign key to Review
-  chunkId         String   // Foreign key to ChunkAnalysis
-  passType        String   // Type of analysis pass (syntax_logic, security_performance, etc.)
-  analysisResult  String   // Full analysis text from LLM
-  riskLevel       String   // Risk level: LOW, MEDIUM, HIGH, CRITICAL
-  issuesFound     Json     // Array of issues found (stored as JSON)
-  recommendations Json     // Array of recommendations (stored as JSON)
-  tokensUsed      Int      // Number of tokens used for this analysis
-  durationMs      Int      // Duration of analysis in milliseconds
+  reviewId        String
+  chunkId         String
+  passType        String   // syntax_logic, security_performance, architecture_design, testing_docs
+  analysisResult  String   // Full LLM response
+  riskLevel       String   // LOW, MEDIUM, HIGH, CRITICAL
+  issuesFound     Json     // Array of extracted issues
+  recommendations Json     // Array of extracted recommendations
+  tokensUsed      Int
+  durationMs      Int
   createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
   
   // Relationships
   review          Review        @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  chunkAnalysis   ChunkAnalysis @relation(fields: [reviewId, chunkId], references: [reviewId, chunkId], onDelete: Cascade)
+  chunk           ChunkAnalysis @relation(fields: [chunkId], references: [chunkId], onDelete: Cascade)
   
-  @@unique([reviewId, chunkId, passType]) // Ensure one pass per type per chunk per review
+  @@unique([chunkId, passType]) // Ensure one pass of each type per chunk
 }

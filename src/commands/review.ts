@@ -16,8 +16,15 @@ import path from 'path';
 const generateMarkdownReport = (state: any, taskId: string, prUrl: string): string => {
   const timestamp = new Date().toISOString();
   const prDetails = state.pr_details || {};
+  
+  // Handle both workflow types: CLI workflow uses analyzed_files, advanced workflow uses file_results
   const analyzedFiles = state.analyzed_files || {};
-  const fileCount = Object.keys(analyzedFiles).length;
+  const fileResults = state.file_results || {};
+  
+  // Count total files analyzed from both sources
+  const analyzedFilesCount = Object.keys(analyzedFiles).length;
+  const fileResultsCount = Object.keys(fileResults).length;
+  const totalFileCount = analyzedFilesCount + fileResultsCount;
   
   // Extract owner/repo from URL for cleaner display
   const urlMatch = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
@@ -37,7 +44,7 @@ const generateMarkdownReport = (state: any, taskId: string, prUrl: string): stri
 | **PR URL** | [${prUrl}](${prUrl}) |
 | **Review Date** | ${new Date(timestamp).toLocaleString()} |
 | **Task ID** | \`${taskId}\` |
-| **Files Analyzed** | ${fileCount} |
+| **Files Analyzed** | ${totalFileCount} |
 
 ## 📝 PR Description
 
@@ -50,12 +57,42 @@ ${prDetails.body || '*No description provided*'}
 `;
 
   // Add individual file analyses
-  if (fileCount > 0) {
-    markdown += `### Files Reviewed (${fileCount})\n\n`;
+  if (totalFileCount > 0) {
+    markdown += `### Files Reviewed (${totalFileCount})\n\n`;
     
+    // Handle CLI workflow analyzed_files (simple string analyses)
     for (const [fileName, analysis] of Object.entries(analyzedFiles)) {
       markdown += `#### 📁 \`${fileName}\`\n\n`;
       markdown += `${analysis || '*No analysis available*'}\n\n`;
+      markdown += `---\n\n`;
+    }
+    
+    // Handle advanced workflow file_results (structured FileAnalysisResult objects)
+    for (const [fileName, result] of Object.entries(fileResults)) {
+      const fileResult = result as any; // Type assertion since we're dealing with any
+      markdown += `#### 📁 \`${fileName}\`\n\n`;
+      
+      if (fileResult.overall_risk) {
+        markdown += `**Risk Level:** ${fileResult.overall_risk}\n`;
+      }
+      if (fileResult.total_issues !== undefined) {
+        markdown += `**Issues Found:** ${fileResult.total_issues}\n`;
+      }
+      if (fileResult.total_chunks !== undefined) {
+        markdown += `**Chunks Analyzed:** ${fileResult.total_chunks}\n`;
+      }
+      
+      markdown += `\n**Analysis:**\n`;
+      markdown += `${fileResult.file_synthesis || '*No synthesis available*'}\n\n`;
+      
+      if (fileResult.recommendations && fileResult.recommendations.length > 0) {
+        markdown += `**Recommendations:**\n`;
+        fileResult.recommendations.forEach((rec: string, index: number) => {
+          markdown += `${index + 1}. ${rec}\n`;
+        });
+        markdown += `\n`;
+      }
+      
       markdown += `---\n\n`;
     }
   } else {
@@ -154,23 +191,31 @@ export const reviewCommandHandler = async (prUrl: string, prisma: PrismaClient, 
       // Fix: Access the state directly from the event
       const state = Object.values(event)[0] as any;
       
-      // Properly merge analyzed_files to preserve all previous analyses
+      // Properly merge both analyzed_files (CLI workflow) and file_results (advanced workflow)
       const currentAnalyzedFiles = lastState.analyzed_files || {};
       const newAnalyzedFiles = state.analyzed_files || {};
       const mergedAnalyzedFiles = { ...currentAnalyzedFiles, ...newAnalyzedFiles };
+      
+      const currentFileResults = lastState.file_results || {};
+      const newFileResults = state.file_results || {};
+      const mergedFileResults = { ...currentFileResults, ...newFileResults };
       
       // Preserve accumulated state by merging with lastState
       lastState = { 
         ...lastState, 
         ...state,
-        analyzed_files: mergedAnalyzedFiles
+        analyzed_files: mergedAnalyzedFiles,
+        file_results: mergedFileResults
       };
       
-      // Ensure analyzed_files is always an object to prevent Object.keys errors
+      // Handle both workflow types for progress tracking
       const analyzedFiles = state.analyzed_files || {};
+      const fileResults = state.file_results || {};
       const filesToReview = state.files_to_review || [];
+      const filesToProcess = state.files_to_process || [];
       
       // Save individual file analyses to database if new analyses are added
+      // Handle CLI workflow analyzed_files (simple string analyses)
       if (state.analyzed_files && Object.keys(state.analyzed_files).length > 0) {
         for (const [fileName, analysis] of Object.entries(state.analyzed_files)) {
           // Check if this file analysis already exists to avoid duplicates
@@ -184,7 +229,7 @@ export const reviewCommandHandler = async (prUrl: string, prisma: PrismaClient, 
           });
           
           if (!existingAnalysis && typeof analysis === 'string') {
-            console.log(chalk.gray(`💾 Saving file analysis for: ${fileName}`));
+            console.log(chalk.gray(`💾 Saving CLI file analysis for: ${fileName}`));
             await prisma.fileAnalysis.create({
               data: {
                 reviewId: taskId,
@@ -193,34 +238,68 @@ export const reviewCommandHandler = async (prUrl: string, prisma: PrismaClient, 
                 diffSize: analysis.length, // Store the analysis length as a proxy for diff size
               }
             });
-            console.log(chalk.green(`✅ File analysis saved for: ${fileName}`));
+            console.log(chalk.green(`✅ CLI file analysis saved for: ${fileName}`));
+          }
+        }
+      }
+      
+      // Handle advanced workflow file_results (structured FileAnalysisResult objects)
+      if (state.file_results && Object.keys(state.file_results).length > 0) {
+        for (const [fileName, result] of Object.entries(state.file_results)) {
+          // Check if this file analysis already exists to avoid duplicates
+          const existingAnalysis = await prisma.fileAnalysis.findUnique({
+            where: {
+              reviewId_fileName: {
+                reviewId: taskId,
+                fileName: fileName
+              }
+            }
+          });
+          
+          if (!existingAnalysis && result && typeof result === 'object') {
+            const fileResult = result as any;
+            const analysisText = fileResult.file_synthesis || 'No synthesis available';
+            console.log(chalk.gray(`💾 Saving advanced file analysis for: ${fileName}`));
+            await prisma.fileAnalysis.create({
+              data: {
+                reviewId: taskId,
+                fileName: fileName,
+                analysis: analysisText,
+                diffSize: analysisText.length,
+              }
+            });
+            console.log(chalk.green(`✅ Advanced file analysis saved for: ${fileName}`));
           }
         }
       }
       
       // Update progress based on workflow state
-      if(state.pr_details && !state.files_to_review) {
+      const totalAnalyzedFiles = Object.keys(analyzedFiles).length + Object.keys(fileResults).length;
+      const totalFilesToProcess = filesToReview.length + filesToProcess.length;
+      
+      if(state.pr_details && !state.files_to_review && !state.filtered_files) {
           if (currentSpinner) currentSpinner.succeed();
           console.log(chalk.green(`\n✅ PR Details fetched successfully`));
           currentSpinner = ora('Getting changed files list...').start();
-      } else if (filesToReview.length > 0 && Object.keys(analyzedFiles).length === 0) {
+      } else if ((filesToReview.length > 0 || filesToProcess.length > 0) && totalAnalyzedFiles === 0) {
           if (currentSpinner) currentSpinner.succeed();
-          console.log(chalk.green(`\n✅ Found ${filesToReview.length} files to analyze`));
-          console.log(chalk.blue(`📋 Files queue: ${filesToReview.join(', ')}`));
+          const totalFiles = filesToReview.length || filesToProcess.length;
+          console.log(chalk.green(`\n✅ Found ${totalFiles} files to analyze`));
+          const filesList = filesToReview.length > 0 ? filesToReview : filesToProcess;
+          console.log(chalk.blue(`📋 Files queue: ${filesList.join(', ')}`));
           
           // Show warning for large number of files
-          if (filesToReview.length > 20) {
-            console.log(chalk.yellow(`⚠️  Large number of files detected (${filesToReview.length}). This may take a while...`));
+          if (totalFiles > 20) {
+            console.log(chalk.yellow(`⚠️  Large number of files detected (${totalFiles}). This may take a while...`));
           }
           
           // Don't start spinner here - let the detailed logs show
-      } else if (Object.keys(analyzedFiles).length > 0) {
+      } else if (totalAnalyzedFiles > 0) {
           if (currentSpinner) currentSpinner.stop();
-          const completed = Object.keys(analyzedFiles).length;
-          const total = completed + filesToReview.length;
-          console.log(chalk.cyan(`\n📈 Progress: ${completed}/${total} files analyzed`));
+          const total = totalAnalyzedFiles + totalFilesToProcess;
+          console.log(chalk.cyan(`\n📈 Progress: ${totalAnalyzedFiles}/${total} files analyzed`));
           
-          if (filesToReview.length > 0) {
+          if (totalFilesToProcess > 0) {
             console.log(chalk.blue(`🔄 Continuing with next file...`));
           } else {
             console.log(chalk.green(`🎯 All files analyzed, generating final report...`));
@@ -239,11 +318,25 @@ export const reviewCommandHandler = async (prUrl: string, prisma: PrismaClient, 
     
     // Handle recursion limit error specifically
     if (error.lc_error_code === 'GRAPH_RECURSION_LIMIT') {
+      const analyzedFilesCount = Object.keys(lastState.analyzed_files || {}).length;
+      const fileResultsCount = Object.keys(lastState.file_results || {}).length;
+      const totalAnalyzed = analyzedFilesCount + fileResultsCount;
+      
       console.error(chalk.red(`\n❌ Workflow hit recursion limit while processing files.`));
-      console.error(chalk.yellow(`🔧 This usually happens with a large number of files (${Object.keys(lastState.analyzed_files || {}).length} files processed so far).`));
+      console.error(chalk.yellow(`🔧 This usually happens with a large number of files (${totalAnalyzed} files processed so far).`));
       console.error(chalk.blue(`💡 Consider breaking down the PR into smaller commits or contact support.`));
-      console.error(chalk.gray(`📋 Files already analyzed: ${Object.keys(lastState.analyzed_files || {}).join(', ')}`));
-      console.error(chalk.gray(`📋 Files remaining: ${(lastState.files_to_review || []).join(', ')}`));
+      
+      const analyzedFilesList = [
+        ...Object.keys(lastState.analyzed_files || {}),
+        ...Object.keys(lastState.file_results || {})
+      ];
+      const remainingFilesList = [
+        ...(lastState.files_to_review || []),
+        ...(lastState.files_to_process || [])
+      ];
+      
+      console.error(chalk.gray(`📋 Files already analyzed: ${analyzedFilesList.join(', ')}`));
+      console.error(chalk.gray(`📋 Files remaining: ${remainingFilesList.join(', ')}`));
     } else {
       console.error(chalk.red(`\n❌ Error during review process: ${error.message || error}`));
     }

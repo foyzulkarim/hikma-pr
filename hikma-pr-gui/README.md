@@ -41,6 +41,8 @@ The GUI shares the same SQLite database as the CLI (`~/.hikmapr/reviews.db`). Ma
 hikma review https://github.com/owner/repo/pull/123
 ```
 
+**⚠️ Important:** If you encounter database errors after schema changes in the main app, see [DATABASE.md](./DATABASE.md) for detailed sync instructions.
+
 ### Development
 ```bash
 npm run dev

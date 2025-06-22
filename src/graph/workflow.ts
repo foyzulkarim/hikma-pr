@@ -19,39 +19,47 @@ import { PromptBuilder } from '../prompts/templates';
 import { PrismaClient } from '@prisma/client';
 import chalk from 'chalk';
 
+const MODEL1 = "llama3.2:3b-instruct-fp16";
+const MODEL2 = "gemma3:27b-it-q8_0";
+const MODEL3 = 'qwen2.5-coder:14b-instruct-q4_K_M';
+const MODEL4 = 'qwen2.5-coder:32b-instruct-q8_0';
+const MODEL5 = 'gemma3:1b';
+
+const SELECTED_MODEL = MODEL4;
+
 // Default configuration
 const DEFAULT_CONFIG: AnalysisConfig = {
   models: {
     syntax_logic: {
-      name: 'gemma3:1b',
+      name: SELECTED_MODEL,
       provider: 'ollama',
       base_url: 'http://localhost:11434',
       max_tokens: 8000,
       temperature: 0.1
     },
     security_performance: {
-      name: 'gemma3:1b',
+      name: SELECTED_MODEL,
       provider: 'ollama',
       base_url: 'http://localhost:11434',
       max_tokens: 8000,
       temperature: 0.1
     },
     architecture_design: {
-      name: 'gemma3:1b',
+      name: SELECTED_MODEL,
       provider: 'ollama',
       base_url: 'http://localhost:11434',
       max_tokens: 8000,
       temperature: 0.1
     },
     testing_docs: {
-      name: 'gemma3:1b',
+      name: SELECTED_MODEL,
       provider: 'ollama',
       base_url: 'http://localhost:11434',
       max_tokens: 8000,
       temperature: 0.1
     },
     synthesis: {
-      name: 'gemma3:1b',
+      name: SELECTED_MODEL,
       provider: 'ollama',
       base_url: 'http://localhost:11434',
       max_tokens: 8000,

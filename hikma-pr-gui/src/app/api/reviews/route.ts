@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET() {
   try {
+    // First, try a simple query to test basic connectivity
     const reviews = await prisma.review.findMany({
       orderBy: {
         createdAt: 'desc'
@@ -13,21 +14,24 @@ export async function GET() {
           include: {
             analysisPasses: true
           }
-        },
-        _count: {
-          select: {
-            chunkAnalyses: true,
-            analysisPasses: true
-          }
         }
       }
     })
     
-    return NextResponse.json(reviews)
+    // Add counts manually to avoid potential issues with _count
+    const reviewsWithCounts = reviews.map(review => ({
+      ...review,
+      _count: {
+        chunkAnalyses: review.chunkAnalyses?.length || 0,
+        analysisPasses: review.analysisPasses?.length || 0
+      }
+    }))
+    
+    return NextResponse.json(reviewsWithCounts)
   } catch (error) {
     console.error('Error fetching reviews:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch reviews' },
+      { error: 'Failed to fetch reviews', details: error.message },
       { status: 500 }
     )
   }

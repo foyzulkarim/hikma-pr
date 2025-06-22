@@ -4,14 +4,21 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "help": "node -e \"console.log('\\n📋 Available Scripts:\\n'); console.log('🔨 Development:'); console.log('  npm run dev          - Run app in development mode (with hot reload)'); console.log('  npm run build        - Build TypeScript to JavaScript'); console.log('  npm start            - Run the built application'); console.log('\\n🗄️  Database (Prisma):'); console.log('  npm run db:generate  - Generate Prisma client after schema changes'); console.log('  npm run db:migrate   - Create and apply new database migration'); console.log('  npm run db:deploy    - Apply existing migrations (for production)'); console.log('  npm run db:reset     - Reset database (⚠️  deletes all data)'); console.log('  npm run db:studio    - Open Prisma Studio (database GUI)'); console.log('  npm run db:status    - Check migration status'); console.log('\\n🧪 Testing:'); console.log('  npm test             - Run tests (not implemented yet)'); console.log('\\n💡 Run \\'npm run help\\' anytime to see this menu\\n');\"",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev --name init",
-    "prisma:reset": "prisma migrate reset",
-    "prisma:studio": "prisma studio"
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:reset": "prisma migrate reset",
+    "db:studio": "prisma studio",
+    "db:status": "prisma migrate status",
+    "prisma:generate": "npm run db:generate",
+    "prisma:migrate": "npm run db:migrate",
+    "prisma:reset": "npm run db:reset",
+    "prisma:studio": "npm run db:studio"
   },
   "repository": {
     "type": "git",

@@ -89,6 +89,29 @@ Supports auto-detection for:
 - Java (Spring, Maven, Gradle)
 - Go modules
 
+## 🛠️ Development Scripts
+
+Quick reference for development tasks:
+
+```bash
+# Show all available scripts with descriptions
+npm run help
+
+# Development workflow
+npm run dev          # Run in development mode (hot reload)
+npm run build        # Build TypeScript to JavaScript
+npm start           # Run the built application
+
+# Database management
+npm run db:generate  # Generate Prisma client after schema changes
+npm run db:migrate   # Create and apply new migration
+npm run db:deploy    # Apply existing migrations (production)
+npm run db:studio    # Open database GUI
+npm run db:status    # Check migration status
+```
+
+For detailed explanations of each script, see [SCRIPTS.md](./SCRIPTS.md) or run `npm run help`.
+
 ## 📊 Example Output
 
 ```bash
