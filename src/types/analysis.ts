@@ -133,9 +133,11 @@ export interface PromptTemplate {
   variables: string[];
 }
 
+export type Provider = 'ollama' | 'openai' | 'lmstudio';
+  
 export interface ModelConfig {
   name: string;
-  provider: 'ollama' | 'openai' | 'lmstudio';
+  provider: Provider;
   base_url?: string;
   api_key?: string;
   max_tokens: number;

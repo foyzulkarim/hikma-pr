@@ -18,6 +18,12 @@ model Review {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   
+  // Analysis metadata
+  modelProvider String? // LLM provider used (ollama, openai, etc.)
+  modelName     String? // Model name used for analysis
+  startedAt     DateTime? // When analysis actually started
+  completedAt   DateTime? // When analysis completed
+  
   // Relationships
   fileAnalyses   FileAnalysis[]
   chunkAnalyses  ChunkAnalysis[]

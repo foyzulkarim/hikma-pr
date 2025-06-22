@@ -10,7 +10,7 @@
  */
 
 import { StateGraph, END } from "@langchain/langgraph";
-import { ReviewState, AnalysisConfig, ChunkInfo, AnalysisPass } from '../types/analysis';
+import { ReviewState, AnalysisConfig, ChunkInfo, AnalysisPass, Provider } from '../types/analysis';
 import { FileFilterService } from '../services/fileFilterService';
 import { ChunkService } from '../services/chunkService';
 import { AnalysisService } from '../services/analysisService';
@@ -25,43 +25,58 @@ const MODEL3 = 'qwen2.5-coder:14b-instruct-q4_K_M';
 const MODEL4 = 'qwen2.5-coder:32b-instruct-q8_0';
 const MODEL5 = 'gemma3:1b';
 
-const SELECTED_MODEL = MODEL4;
+// LM Studio models
+const LMS_QWEN25_CODER_14B = 'qwen2.5-coder-14b-instruct-mlx';
+const LMS_QWEN25_CODER_32B = 'qwen/qwen2.5-coder-32b';
+const LMS_GEMMA_3_1B = 'google/gemma-3-1b';
+
+const SELECTED_MODEL = LMS_GEMMA_3_1B;
+
+const URLS = {
+  OLLAMA: 'http://localhost:11434',
+  LMSTUDIO: 'http://localhost:1234',
+};
+
+const SELECTED_PROVIDER = {
+  NAME: "lmstudio" as Provider,
+  BASE_URL: URLS.LMSTUDIO,
+};
 
 // Default configuration
-const DEFAULT_CONFIG: AnalysisConfig = {
+export const DEFAULT_CONFIG: AnalysisConfig = {
   models: {
     syntax_logic: {
       name: SELECTED_MODEL,
-      provider: 'ollama',
-      base_url: 'http://localhost:11434',
+      provider: SELECTED_PROVIDER.NAME,
+      base_url: SELECTED_PROVIDER.BASE_URL,
       max_tokens: 8000,
       temperature: 0.1
     },
     security_performance: {
       name: SELECTED_MODEL,
-      provider: 'ollama',
-      base_url: 'http://localhost:11434',
+      provider: SELECTED_PROVIDER.NAME,
+      base_url: SELECTED_PROVIDER.BASE_URL,
       max_tokens: 8000,
       temperature: 0.1
     },
     architecture_design: {
       name: SELECTED_MODEL,
-      provider: 'ollama',
-      base_url: 'http://localhost:11434',
+      provider: SELECTED_PROVIDER.NAME,
+      base_url: SELECTED_PROVIDER.BASE_URL,
       max_tokens: 8000,
       temperature: 0.1
     },
     testing_docs: {
       name: SELECTED_MODEL,
-      provider: 'ollama',
-      base_url: 'http://localhost:11434',
+      provider: SELECTED_PROVIDER.NAME,
+      base_url: SELECTED_PROVIDER.BASE_URL,
       max_tokens: 8000,
       temperature: 0.1
     },
     synthesis: {
       name: SELECTED_MODEL,
-      provider: 'ollama',
-      base_url: 'http://localhost:11434',
+      provider: SELECTED_PROVIDER.NAME,
+      base_url: SELECTED_PROVIDER.BASE_URL,
       max_tokens: 8000,
       temperature: 0.3
     }

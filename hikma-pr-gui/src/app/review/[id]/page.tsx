@@ -59,6 +59,13 @@ interface Review {
   error?: string | null
   createdAt: string
   updatedAt: string
+  
+  // Analysis metadata
+  modelProvider?: string
+  modelName?: string
+  startedAt?: string
+  completedAt?: string
+  
   chunkAnalyses: ChunkAnalysis[]
   fileAnalyses?: Array<{
     fileName: string
@@ -315,6 +322,41 @@ export default function ReviewDetail() {
                     {Math.round((review.state.progress.completed_passes / review.state.progress.total_passes) * 100)}%
                   </div>
                   <div className="text-sm text-gray-600">Complete</div>
+                </div>
+              </div>
+            )}
+            
+            {/* Analysis Performance */}
+            {(review.modelProvider || review.startedAt || review.completedAt) && (
+              <div className="mt-4 bg-blue-50 rounded p-4">
+                <h3 className="text-sm font-medium text-blue-800 mb-3">⏱️ Analysis Performance</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  {review.modelProvider && (
+                    <div>
+                      <div className="font-medium text-blue-700">Provider</div>
+                      <div className="text-blue-600">{review.modelProvider}</div>
+                    </div>
+                  )}
+                  {review.modelName && (
+                    <div>
+                      <div className="font-medium text-blue-700">Model</div>
+                      <div className="text-blue-600 font-mono text-xs">{review.modelName}</div>
+                    </div>
+                  )}
+                  {review.startedAt && (
+                    <div>
+                      <div className="font-medium text-blue-700">Started</div>
+                      <div className="text-blue-600">{new Date(review.startedAt).toLocaleTimeString()}</div>
+                    </div>
+                  )}
+                  {review.completedAt && review.startedAt && (
+                    <div>
+                      <div className="font-medium text-blue-700">Duration</div>
+                      <div className="text-blue-600">
+                        {Math.round((new Date(review.completedAt).getTime() - new Date(review.startedAt).getTime()) / 1000)}s
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
