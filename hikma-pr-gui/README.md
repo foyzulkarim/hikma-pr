@@ -2,6 +2,8 @@
 
 A modern Next.js dashboard for viewing and analyzing Hikmapr's advanced multi-pass PR reviews.
 
+![Hikma-PR GUI](https://raw.githubusercontent.com/foyzulkarim/hikma-pr/main/hikma-pr-gui/hikma-pr-gui.png) 
+
 ## ✨ Features
 
 ### **Multi-Pass Analysis Visualization**
