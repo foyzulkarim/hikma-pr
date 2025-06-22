@@ -10,6 +10,21 @@ export async function GET(
     const review = await prisma.review.findUnique({
       where: {
         id: id
+      },
+      include: {
+        fileAnalyses: true,
+        chunkAnalyses: {
+          include: {
+            analysisPasses: {
+              orderBy: {
+                passType: 'asc'
+              }
+            }
+          },
+          orderBy: {
+            filePath: 'asc'
+          }
+        }
       }
     })
 

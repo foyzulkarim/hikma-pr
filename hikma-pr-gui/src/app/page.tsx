@@ -1,15 +1,45 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 interface Review {
   id: string
   prUrl: string
-  state: Record<string, unknown>
+  state: {
+    pr_details?: {
+      title: string
+      body: string
+    }
+    progress?: {
+      total_files: number
+      completed_files: number
+      total_chunks: number
+      completed_chunks: number
+      total_passes: number
+      completed_passes: number
+    }
+    synthesis_data?: {
+      decision: 'APPROVE' | 'REQUEST_CHANGES' | 'REJECT'
+      overall_assessment: string
+    }
+    final_report?: string
+  }
   error?: string | null
   createdAt: string
   updatedAt: string
+  _count?: {
+    chunkAnalyses: number
+    analysisPasses: number
+  }
+  chunkAnalyses?: Array<{
+    id: string
+    filePath: string
+    analysisPasses: Array<{
+      passType: string
+      riskLevel: string
+    }>
+  }>
 }
 
 export default function Home() {
@@ -52,12 +82,76 @@ export default function Home() {
     return null
   }
 
+  const getDecisionBadge = (decision?: string) => {
+    const baseClasses = "px-2 py-1 rounded text-sm font-medium"
+    switch (decision) {
+      case 'APPROVE':
+        return `${baseClasses} bg-green-100 text-green-800`
+      case 'REQUEST_CHANGES':
+        return `${baseClasses} bg-yellow-100 text-yellow-800`
+      case 'REJECT':
+        return `${baseClasses} bg-red-100 text-red-800`
+      default:
+        return `${baseClasses} bg-gray-100 text-gray-800`
+    }
+  }
+
+  const getHighestRiskLevel = (chunkAnalyses?: Review['chunkAnalyses']) => {
+    if (!chunkAnalyses || chunkAnalyses.length === 0) return 'UNKNOWN'
+    
+    const riskLevels = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
+    let highestRisk = 'LOW'
+    
+    for (const chunk of chunkAnalyses) {
+      for (const pass of chunk.analysisPasses) {
+        const currentRiskIndex = riskLevels.indexOf(pass.riskLevel)
+        const highestRiskIndex = riskLevels.indexOf(highestRisk)
+        if (currentRiskIndex > highestRiskIndex) {
+          highestRisk = pass.riskLevel
+        }
+      }
+    }
+    
+    return highestRisk
+  }
+
+  const getRiskBadge = (riskLevel: string) => {
+    const baseClasses = "px-2 py-1 rounded text-sm font-medium"
+    switch (riskLevel) {
+      case 'LOW':
+        return `${baseClasses} bg-green-100 text-green-800`
+      case 'MEDIUM':
+        return `${baseClasses} bg-yellow-100 text-yellow-800`
+      case 'HIGH':
+        return `${baseClasses} bg-orange-100 text-orange-800`
+      case 'CRITICAL':
+        return `${baseClasses} bg-red-100 text-red-800`
+      default:
+        return `${baseClasses} bg-gray-100 text-gray-800`
+    }
+  }
+
+  const getProgressPercentage = (progress?: Review['state']['progress']) => {
+    if (!progress) return 0
+    if (progress.total_passes === 0) return 0
+    return Math.round((progress.completed_passes / progress.total_passes) * 100)
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading reviews...</p>
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/4 mb-8"></div>
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white p-6 rounded-lg shadow">
+                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -65,83 +159,142 @@ export default function Home() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600">Error: {error}</p>
-          <button 
-            onClick={fetchReviews}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Retry
-          </button>
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <h3 className="text-lg font-medium text-red-800">Error</h3>
+            <p className="text-red-600">{error}</p>
+            <button 
+              onClick={fetchReviews}
+              className="mt-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Hikma PR Reviews</h1>
-            <p className="mt-2 text-gray-600">View all PR review entries from the database</p>
-          </div>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            🔬 Hikmapr Multi-Pass PR Reviews
+          </h1>
+          <p className="text-gray-600">
+            Advanced AI-powered pull request analysis with 4-pass specialized review
+          </p>
+        </div>
 
-          {reviews.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">No reviews found in the database.</p>
-            </div>
-          ) : (
-            <div className="bg-white shadow overflow-hidden sm:rounded-md">
-              <ul className="divide-y divide-gray-200">
-                {reviews.map((review) => {
-                  const prInfo = extractPRInfo(review.prUrl)
-                  return (
-                    <li key={review.id}>
-                      <Link 
-                        href={`/review/${review.id}`}
-                        className="block hover:bg-gray-50 px-4 py-4 sm:px-6"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center">
-                              <div className="flex-shrink-0">
-                                <div className="h-10 w-10 bg-blue-500 rounded-full flex items-center justify-center">
-                                  <span className="text-white font-medium text-sm">PR</span>
-                                </div>
-                              </div>
-                              <div className="ml-4 flex-1 min-w-0">
-                                <div className="flex items-center">
-                                  <p className="text-sm font-medium text-blue-600 truncate">
-                                    {prInfo ? `${prInfo.owner}/${prInfo.repo}#${prInfo.number}` : 'PR Review'}
-                                  </p>
-                                </div>
-                                <p className="text-sm text-gray-500 truncate">
-                                  {review.prUrl}
-                                </p>
-                                <div className="mt-2 flex items-center text-sm text-gray-500">
-                                  <p>Created: {formatDate(review.createdAt)}</p>
-                                  <span className="mx-2">•</span>
-                                  <p>Updated: {formatDate(review.updatedAt)}</p>
-                                </div>
-                              </div>
-                            </div>
+        {reviews.length === 0 ? (
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Reviews Yet</h3>
+            <p className="text-gray-600 mb-4">
+              Start your first multi-pass PR analysis with the CLI:
+            </p>
+            <code className="bg-gray-100 px-3 py-2 rounded text-sm">
+              hikma review https://github.com/owner/repo/pull/123
+            </code>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {reviews.map((review) => {
+              const prInfo = extractPRInfo(review.prUrl)
+              const progress = getProgressPercentage(review.state.progress)
+              const decision = review.state.synthesis_data?.decision
+              const riskLevel = getHighestRiskLevel(review.chunkAnalyses)
+              const isComplete = review.state.final_report ? true : false
+
+              return (
+                <Link key={review.id} href={`/review/${review.id}`}>
+                  <div className="bg-white rounded-lg shadow hover:shadow-md transition-shadow p-6 cursor-pointer border border-gray-200 hover:border-blue-300">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {review.state.pr_details?.title || 'Untitled PR'}
+                          </h3>
+                          {isComplete && (
+                            <span className={getDecisionBadge(decision)}>
+                              {decision || 'PENDING'}
+                            </span>
+                          )}
+                          <span className={getRiskBadge(riskLevel)}>
+                            {riskLevel} Risk
+                          </span>
+                        </div>
+                        
+                        {prInfo && (
+                          <p className="text-sm text-gray-600 mb-2">
+                            <span className="font-medium">{prInfo.owner}/{prInfo.repo}</span>
+                            <span className="mx-2">•</span>
+                            <span>PR #{prInfo.number}</span>
+                          </p>
+                        )}
+                        
+                        <div className="flex items-center gap-4 text-sm text-gray-500">
+                          <span>📅 {formatDate(review.createdAt)}</span>
+                          {review._count && (
+                            <>
+                              <span>🧩 {review._count.chunkAnalyses} chunks</span>
+                              <span>🔬 {review._count.analysisPasses} passes</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="text-right">
+                        <div className="text-sm text-gray-500 mb-1">Progress</div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-20 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                              style={{ width: `${progress}%` }}
+                            ></div>
                           </div>
-                          <div className="flex-shrink-0">
-                            <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                            </svg>
+                          <span className="text-sm font-medium text-gray-700">
+                            {progress}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {review.state.progress && (
+                      <div className="grid grid-cols-3 gap-4 text-sm bg-gray-50 rounded p-3">
+                        <div>
+                          <div className="font-medium text-gray-700">Files</div>
+                          <div className="text-gray-600">
+                            {review.state.progress.completed_files}/{review.state.progress.total_files}
                           </div>
                         </div>
-                      </Link>
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          )}
-        </div>
+                        <div>
+                          <div className="font-medium text-gray-700">Chunks</div>
+                          <div className="text-gray-600">
+                            {review.state.progress.completed_chunks}/{review.state.progress.total_chunks}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-700">Analysis Passes</div>
+                          <div className="text-gray-600">
+                            {review.state.progress.completed_passes}/{review.state.progress.total_passes}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {review.error && (
+                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
+                        <p className="text-sm text-red-600">❌ {review.error}</p>
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )

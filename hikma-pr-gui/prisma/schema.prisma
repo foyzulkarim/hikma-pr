@@ -18,8 +18,16 @@ model Review {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   
-  // Relationship to file analyses
-  fileAnalyses FileAnalysis[]
+  // Analysis metadata
+  modelProvider String? // LLM provider used (ollama, openai, etc.)
+  modelName     String? // Model name used for analysis
+  startedAt     DateTime? // When analysis actually started
+  completedAt   DateTime? // When analysis completed
+  
+  // Relationships
+  fileAnalyses   FileAnalysis[]
+  chunkAnalyses  ChunkAnalysis[]
+  analysisPasses AnalysisPass[]
 }
 
 model FileAnalysis {
@@ -35,4 +43,44 @@ model FileAnalysis {
   review     Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
   
   @@unique([reviewId, fileName]) // Ensure one analysis per file per review
+}
+
+// New models for enhanced multi-pass analysis tracking
+model ChunkAnalysis {
+  id             String   @id @default(cuid())
+  reviewId       String
+  chunkId        String   @unique // UUID for the chunk
+  filePath       String
+  startLine      Int?
+  endLine        Int?
+  sizeTokens     Int
+  diffContent    String
+  isCompleteFile Boolean  @default(false)
+  contextBefore  String?
+  contextAfter   String?
+  createdAt      DateTime @default(now())
+  
+  // Relationships
+  review         Review        @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  analysisPasses AnalysisPass[]
+}
+
+model AnalysisPass {
+  id              String   @id @default(cuid())
+  reviewId        String
+  chunkId         String
+  passType        String   // syntax_logic, security_performance, architecture_design, testing_docs
+  analysisResult  String   // Full LLM response
+  riskLevel       String   // LOW, MEDIUM, HIGH, CRITICAL
+  issuesFound     Json     // Array of extracted issues
+  recommendations Json     // Array of extracted recommendations
+  tokensUsed      Int
+  durationMs      Int
+  createdAt       DateTime @default(now())
+  
+  // Relationships
+  review          Review        @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  chunk           ChunkAnalysis @relation(fields: [chunkId], references: [chunkId], onDelete: Cascade)
+  
+  @@unique([chunkId, passType]) // Ensure one pass of each type per chunk
 }

@@ -36,7 +36,7 @@ program
 
 program
   .command('review')
-  .description('Start a new review for a given Pull Request URL.')
+  .description('Start a new multi-pass PR review analysis.')
   .argument('<url>', 'The full URL of the GitHub Pull Request to review.')
   .action(async (url) => {
     try {

@@ -13,8 +13,9 @@ const MODEL1 = "llama3.2:3b-instruct-fp16";
 const MODEL2 = "gemma3:27b-it-q8_0";
 const MODEL3 = 'qwen2.5-coder:14b-instruct-q4_K_M';
 const MODEL4 = 'qwen2.5-coder:32b-instruct-q8_0';
+const MODEL5 = 'gemma3:1b';
 
-const SELECTED_MODEL = MODEL4;
+const SELECTED_MODEL = MODEL3;
 
 // LLM Provider Configuration
 interface LLMConfig {

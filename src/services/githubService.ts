@@ -297,3 +297,52 @@ const extractFileDiffFromFullDiff = (fullDiff: string, targetFilePath: string): 
 
   return null;
 };
+
+/**
+ * Fetches the ENTIRE PR diff once via gh CLI for local processing
+ * This avoids multiple API calls and rate limiting issues
+ */
+export const getFullPrDiffViaCli = async (prUrl: string): Promise<string | null> => {
+  console.log(chalk.blue(`\n📄 Fetching FULL PR diff via gh CLI (single call)...`));
+  
+  try {
+    console.log(chalk.blue(`🔧 Executing: gh pr diff ${prUrl}`));
+    const startTime = Date.now();
+    
+    const { stdout } = await execAsync(`gh pr diff ${prUrl}`);
+    
+    const endTime = Date.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+    if (!stdout.trim()) {
+      console.log(chalk.red(`❌ No diff found in PR`));
+      return null;
+    }
+
+    console.log(chalk.green(`✅ Full PR diff fetched in ${duration}s (${stdout.length} characters)`));
+    console.log(chalk.blue(`📊 This single call will be processed locally for all files`));
+    
+    return stdout;
+  } catch (error) {
+    console.error(chalk.red(`❌ Error fetching full PR diff via CLI:`), error);
+    return null;
+  }
+};
+
+/**
+ * Extract diff for a specific file from the already-fetched full diff
+ * This is a LOCAL operation - no API calls!
+ */
+export const extractFileFromFullDiff = (fullDiff: string, targetFilePath: string): string | null => {
+  console.log(chalk.gray(`🔍 Locally extracting diff for: ${chalk.yellow(targetFilePath)}`));
+  
+  const fileDiff = extractFileDiffFromFullDiff(fullDiff, targetFilePath);
+  
+  if (fileDiff) {
+    console.log(chalk.green(`✅ Extracted ${fileDiff.length} characters for ${targetFilePath}`));
+  } else {
+    console.log(chalk.yellow(`⚠️  File ${targetFilePath} not found in diff`));
+  }
+  
+  return fileDiff;
+};

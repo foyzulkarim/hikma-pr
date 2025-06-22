@@ -1,8 +1,34 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
+
+interface AnalysisPass {
+  id: string
+  passType: string
+  analysisResult: string
+  riskLevel: string
+  issuesFound: string[]
+  recommendations: string[]
+  tokensUsed: number
+  durationMs: number
+  createdAt: string
+}
+
+interface ChunkAnalysis {
+  id: string
+  chunkId: string
+  filePath: string
+  startLine?: number
+  endLine?: number
+  sizeTokens: number
+  diffContent: string
+  isCompleteFile: boolean
+  contextBefore?: string
+  contextAfter?: string
+  analysisPasses: AnalysisPass[]
+}
 
 interface Review {
   id: string
@@ -12,13 +38,39 @@ interface Review {
       title: string
       body: string
     }
-    analyzed_files?: Record<string, string>
-    files_to_review?: string[]
+    progress?: {
+      total_files: number
+      completed_files: number
+      total_chunks: number
+      completed_chunks: number
+      total_passes: number
+      completed_passes: number
+    }
+    synthesis_data?: {
+      decision: 'APPROVE' | 'REQUEST_CHANGES' | 'REJECT'
+      overall_assessment: string
+      critical_issues: string[]
+      important_recommendations: string[]
+      minor_suggestions: string[]
+      reasoning: string
+    }
     final_report?: string
   }
   error?: string | null
   createdAt: string
   updatedAt: string
+  
+  // Analysis metadata
+  modelProvider?: string
+  modelName?: string
+  startedAt?: string
+  completedAt?: string
+  
+  chunkAnalyses: ChunkAnalysis[]
+  fileAnalyses?: Array<{
+    fileName: string
+    analysis: string
+  }>
 }
 
 export default function ReviewDetail() {
@@ -26,8 +78,8 @@ export default function ReviewDetail() {
   const [review, setReview] = useState<Review | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
-  const [showRawJson, setShowRawJson] = useState(false)
+  const [expandedChunks, setExpandedChunks] = useState<Set<string>>(new Set())
+  const [selectedPassType, setSelectedPassType] = useState<string>('all')
 
   useEffect(() => {
     if (params.id) {
@@ -66,59 +118,112 @@ export default function ReviewDetail() {
     return null
   }
 
-  const toggleFileExpansion = (fileName: string) => {
-    const newExpanded = new Set(expandedFiles)
-    if (newExpanded.has(fileName)) {
-      newExpanded.delete(fileName)
+  const toggleChunkExpansion = (chunkId: string) => {
+    const newExpanded = new Set(expandedChunks)
+    if (newExpanded.has(chunkId)) {
+      newExpanded.delete(chunkId)
     } else {
-      newExpanded.add(fileName)
+      newExpanded.add(chunkId)
     }
-    setExpandedFiles(newExpanded)
+    setExpandedChunks(newExpanded)
   }
 
-  const formatMarkdown = (text: string) => {
-    // Simple markdown-like formatting
-    return text
-      .replace(/^### (.+)$/gm, '<h3 class="text-lg font-semibold text-gray-900 mt-4 mb-2">$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2 class="text-xl font-semibold text-gray-900 mt-6 mb-3">$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold text-gray-900 mt-8 mb-4">$1</h1>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold">$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em class="italic">$1</em>')
-      .replace(/`(.+?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">$1</code>')
-      .replace(/\n/g, '<br>')
+  const getRiskBadge = (riskLevel: string) => {
+    const baseClasses = "px-2 py-1 rounded text-xs font-medium"
+    switch (riskLevel) {
+      case 'LOW':
+        return `${baseClasses} bg-green-100 text-green-800`
+      case 'MEDIUM':
+        return `${baseClasses} bg-yellow-100 text-yellow-800`
+      case 'HIGH':
+        return `${baseClasses} bg-orange-100 text-orange-800`
+      case 'CRITICAL':
+        return `${baseClasses} bg-red-100 text-red-800`
+      default:
+        return `${baseClasses} bg-gray-100 text-gray-800`
+    }
+  }
+
+  const getDecisionBadge = (decision: string) => {
+    const baseClasses = "px-3 py-1 rounded-full text-sm font-medium"
+    switch (decision) {
+      case 'APPROVE':
+        return `${baseClasses} bg-green-100 text-green-800`
+      case 'REQUEST_CHANGES':
+        return `${baseClasses} bg-yellow-100 text-yellow-800`
+      case 'REJECT':
+        return `${baseClasses} bg-red-100 text-red-800`
+      default:
+        return `${baseClasses} bg-gray-100 text-gray-800`
+    }
+  }
+
+  const getPassTypeIcon = (passType: string) => {
+    switch (passType) {
+      case 'syntax_logic': return '🔍'
+      case 'security_performance': return '🔒'
+      case 'architecture_design': return '🏗️'
+      case 'testing_docs': return '📋'
+      default: return '📝'
+    }
+  }
+
+  const getPassTypeName = (passType: string) => {
+    switch (passType) {
+      case 'syntax_logic': return 'Syntax & Logic'
+      case 'security_performance': return 'Security & Performance'
+      case 'architecture_design': return 'Architecture & Design'
+      case 'testing_docs': return 'Testing & Documentation'
+      default: return passType
+    }
+  }
+
+  const groupChunksByFile = (chunks: ChunkAnalysis[]) => {
+    const grouped: { [filePath: string]: ChunkAnalysis[] } = {}
+    chunks.forEach(chunk => {
+      if (!grouped[chunk.filePath]) {
+        grouped[chunk.filePath] = []
+      }
+      grouped[chunk.filePath].push(chunk)
+    })
+    return grouped
   }
 
   const getFileIcon = (fileName: string) => {
-    const extension = fileName.split('.').pop()?.toLowerCase()
-    const iconClass = "w-4 h-4 mr-2 flex-shrink-0"
-    
-    switch (extension) {
-      case 'js':
-      case 'jsx':
-        return <div className={`${iconClass} bg-yellow-400 rounded`} title="JavaScript" />
-      case 'ts':
-      case 'tsx':
-        return <div className={`${iconClass} bg-blue-600 rounded`} title="TypeScript" />
-      case 'css':
-      case 'scss':
-        return <div className={`${iconClass} bg-pink-500 rounded`} title="Stylesheet" />
-      case 'html':
-        return <div className={`${iconClass} bg-orange-500 rounded`} title="HTML" />
-      case 'json':
-        return <div className={`${iconClass} bg-green-500 rounded`} title="JSON" />
-      case 'md':
-        return <div className={`${iconClass} bg-gray-600 rounded`} title="Markdown" />
-      default:
-        return <div className={`${iconClass} bg-gray-400 rounded`} title="File" />
+    const ext = fileName.split('.').pop()?.toLowerCase()
+    switch (ext) {
+      case 'ts': case 'tsx': return '🔷'
+      case 'js': case 'jsx': return '🟨'
+      case 'py': return '🐍'
+      case 'java': return '☕'
+      case 'go': return '🐹'
+      case 'rs': return '🦀'
+      case 'md': return '📝'
+      case 'json': return '📋'
+      case 'yaml': case 'yml': return '⚙️'
+      default: return '📄'
     }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading review...</p>
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/4 mb-8"></div>
+            <div className="space-y-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white p-6 rounded-lg shadow">
+                  <div className="h-6 bg-gray-200 rounded w-1/2 mb-4"></div>
+                  <div className="space-y-2">
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -126,20 +231,12 @@ export default function ReviewDetail() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
-            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
-              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <p className="text-red-600 font-medium">Error loading review</p>
-            <p className="text-red-500 text-sm mt-1">{error}</p>
-            <Link 
-              href="/"
-              className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="bg-red-50 border border-red-200 rounded-md p-4">
+            <h3 className="text-lg font-medium text-red-800">Error</h3>
+            <p className="text-red-600">{error}</p>
+            <Link href="/" className="mt-2 inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
               Back to Reviews
             </Link>
           </div>
@@ -150,20 +247,11 @@ export default function ReviewDetail() {
 
   if (!review) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-gray-100 rounded-full">
-              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <p className="text-gray-600 font-medium">Review not found</p>
-            <p className="text-gray-500 text-sm mt-1">The requested review could not be found</p>
-            <Link 
-              href="/"
-              className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center">
+            <h3 className="text-lg font-medium text-gray-900">Review not found</h3>
+            <Link href="/" className="mt-2 inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
               Back to Reviews
             </Link>
           </div>
@@ -173,237 +261,306 @@ export default function ReviewDetail() {
   }
 
   const prInfo = extractPRInfo(review.prUrl)
-  const { pr_details, analyzed_files, files_to_review, final_report } = review.state || {}
+  const fileGroups = groupChunksByFile(review.chunkAnalyses)
+  const passTypes = ['all', 'syntax_logic', 'security_performance', 'architecture_design', 'testing_docs']
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <Link 
-            href="/"
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center mb-4 transition-colors"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Reviews
+          <Link href="/" className="text-blue-600 hover:text-blue-800 mb-4 inline-block">
+            ← Back to Reviews
           </Link>
           
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                {pr_details?.title || (prInfo ? `${prInfo.owner}/${prInfo.repo} PR #${prInfo.number}` : 'Review Details')}
-              </h1>
-              <p className="mt-2 text-sm text-gray-600">Review ID: {review.id}</p>
-              <p className="text-sm text-gray-600">Created: {formatDate(review.createdAt)}</p>
-            </div>
-            
-            <div className="flex gap-2">
-              <a 
-                href={review.prUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="inline-flex items-center px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                </svg>
-                View PR
-              </a>
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                  {review.state.pr_details?.title || 'Untitled PR'}
+                </h1>
+                {prInfo && (
+                  <p className="text-gray-600">
+                    <span className="font-medium">{prInfo.owner}/{prInfo.repo}</span> • PR #{prInfo.number}
+                  </p>
+                )}
+                <p className="text-sm text-gray-500 mt-1">
+                  Created: {formatDate(review.createdAt)}
+                </p>
+              </div>
               
-              <button
-                onClick={() => setShowRawJson(!showRawJson)}
-                className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                </svg>
-                {showRawJson ? 'Hide' : 'Show'} JSON
-              </button>
+              {review.state.synthesis_data?.decision && (
+                <span className={getDecisionBadge(review.state.synthesis_data.decision)}>
+                  {review.state.synthesis_data.decision}
+                </span>
+              )}
             </div>
+
+            {/* Progress */}
+            {review.state.progress && (
+              <div className="grid grid-cols-4 gap-4 bg-gray-50 rounded p-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {review.state.progress.completed_files}/{review.state.progress.total_files}
+                  </div>
+                  <div className="text-sm text-gray-600">Files</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {review.state.progress.completed_chunks}/{review.state.progress.total_chunks}
+                  </div>
+                  <div className="text-sm text-gray-600">Chunks</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {review.state.progress.completed_passes}/{review.state.progress.total_passes}
+                  </div>
+                  <div className="text-sm text-gray-600">Analysis Passes</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-gray-700">
+                    {Math.round((review.state.progress.completed_passes / review.state.progress.total_passes) * 100)}%
+                  </div>
+                  <div className="text-sm text-gray-600">Complete</div>
+                </div>
+              </div>
+            )}
+            
+            {/* Analysis Performance */}
+            {(review.modelProvider || review.startedAt || review.completedAt) && (
+              <div className="mt-4 bg-blue-50 rounded p-4">
+                <h3 className="text-sm font-medium text-blue-800 mb-3">⏱️ Analysis Performance</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  {review.modelProvider && (
+                    <div>
+                      <div className="font-medium text-blue-700">Provider</div>
+                      <div className="text-blue-600">{review.modelProvider}</div>
+                    </div>
+                  )}
+                  {review.modelName && (
+                    <div>
+                      <div className="font-medium text-blue-700">Model</div>
+                      <div className="text-blue-600 font-mono text-xs">{review.modelName}</div>
+                    </div>
+                  )}
+                  {review.startedAt && (
+                    <div>
+                      <div className="font-medium text-blue-700">Started</div>
+                      <div className="text-blue-600">{new Date(review.startedAt).toLocaleTimeString()}</div>
+                    </div>
+                  )}
+                  {review.completedAt && review.startedAt && (
+                    <div>
+                      <div className="font-medium text-blue-700">Duration</div>
+                      <div className="text-blue-600">
+                        {Math.round((new Date(review.completedAt).getTime() - new Date(review.startedAt).getTime()) / 1000)}s
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Error Display */}
-        {review.error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <h3 className="text-red-800 font-medium">Review Error</h3>
-            </div>
-            <p className="mt-2 text-red-700 text-sm">{review.error}</p>
-          </div>
-        )}
-
-        {/* Raw JSON Display */}
-        {showRawJson && (
-          <div className="mb-6 bg-white shadow-sm rounded-lg border">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-900">Raw JSON Data</h2>
-            </div>
-            <div className="p-6">
-              <pre className="bg-gray-50 rounded-lg p-4 text-xs overflow-auto max-h-96">
-                <code className="text-gray-800">
-                  {JSON.stringify(review.state, null, 2)}
-                </code>
+        {/* Final Report */}
+        {review.state.final_report && (
+          <div className="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">📊 Final Analysis Report</h2>
+            <div className="prose max-w-none">
+              <pre className="whitespace-pre-wrap text-sm text-gray-700 bg-gray-50 p-4 rounded">
+                {review.state.final_report}
               </pre>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* PR Details */}
-            {pr_details && (
-              <div className="bg-white shadow-sm rounded-lg border">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-lg font-medium text-gray-900 flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Pull Request Details
-                  </h2>
+        {/* Synthesis Data */}
+        {review.state.synthesis_data && (
+          <div className="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">🎯 Analysis Summary</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {review.state.synthesis_data.critical_issues.length > 0 && (
+                <div>
+                  <h3 className="font-medium text-red-800 mb-2">🚨 Critical Issues</h3>
+                  <ul className="text-sm space-y-1">
+                    {review.state.synthesis_data.critical_issues.map((issue, index) => (
+                      <li key={index} className="text-red-700">• {issue}</li>
+                    ))}
+                  </ul>
                 </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-4">{pr_details.title}</h3>
-                  {pr_details.body && (
-                    <div 
-                      className="prose prose-sm max-w-none text-gray-700"
-                      dangerouslySetInnerHTML={{ __html: formatMarkdown(pr_details.body) }}
-                    />
-                  )}
+              )}
+              
+              {review.state.synthesis_data.important_recommendations.length > 0 && (
+                <div>
+                  <h3 className="font-medium text-yellow-800 mb-2">⚠️ Important Recommendations</h3>
+                  <ul className="text-sm space-y-1">
+                    {review.state.synthesis_data.important_recommendations.map((rec, index) => (
+                      <li key={index} className="text-yellow-700">• {rec}</li>
+                    ))}
+                  </ul>
                 </div>
-              </div>
-            )}
-
-            {/* File Reviews */}
-            {analyzed_files && Object.keys(analyzed_files).length > 0 && (
-              <div className="bg-white shadow-sm rounded-lg border">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-lg font-medium text-gray-900 flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    File Reviews ({Object.keys(analyzed_files).length} files)
-                  </h2>
+              )}
+              
+              {review.state.synthesis_data.minor_suggestions.length > 0 && (
+                <div>
+                  <h3 className="font-medium text-blue-800 mb-2">💡 Minor Suggestions</h3>
+                  <ul className="text-sm space-y-1">
+                    {review.state.synthesis_data.minor_suggestions.map((suggestion, index) => (
+                      <li key={index} className="text-blue-700">• {suggestion}</li>
+                    ))}
+                  </ul>
                 </div>
-                <div className="divide-y divide-gray-200">
-                  {Object.entries(analyzed_files).map(([fileName, review], index) => (
-                    <div key={fileName} className="p-6">
-                      <button
-                        onClick={() => toggleFileExpansion(fileName)}
-                        className="flex items-center w-full text-left group hover:bg-gray-50 -m-2 p-2 rounded-lg transition-colors"
-                      >
-                        {getFileIcon(fileName)}
-                        <span className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors truncate">
-                          {fileName}
-                        </span>
-                        <svg 
-                          className={`w-4 h-4 ml-auto text-gray-400 transition-transform ${
-                            expandedFiles.has(fileName) ? 'rotate-90' : ''
-                          }`}
-                          fill="none" 
-                          stroke="currentColor" 
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-                      
-                      {expandedFiles.has(fileName) && (
-                        <div className="mt-4 pl-6">
-                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <div 
-                              className="prose prose-sm max-w-none text-gray-700"
-                              dangerouslySetInnerHTML={{ __html: formatMarkdown(review) }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+              )}
+            </div>
+            
+            <div className="mt-4 p-4 bg-gray-50 rounded">
+              <p className="text-sm text-gray-700">
+                <strong>Reasoning:</strong> {review.state.synthesis_data.reasoning}
+              </p>
+            </div>
           </div>
+        )}
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Summary Card */}
-            {final_report && (
-              <div className="bg-white shadow-sm rounded-lg border">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-lg font-medium text-gray-900 flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    Summary Report
-                  </h2>
-                </div>
-                <div className="p-6">
-                  <div 
-                    className="prose prose-sm max-w-none text-gray-700"
-                    dangerouslySetInnerHTML={{ __html: formatMarkdown(final_report) }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Stats Card */}
-            <div className="bg-white shadow-sm rounded-lg border">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-medium text-gray-900">Review Statistics</h2>
-              </div>
-              <div className="p-6 space-y-4">
-                {analyzed_files && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Files Reviewed</span>
-                    <span className="text-sm font-medium text-gray-900">{Object.keys(analyzed_files).length}</span>
-                  </div>
-                )}
-                {files_to_review && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Files Pending</span>
-                    <span className="text-sm font-medium text-gray-900">{files_to_review.length}</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Status</span>
-                  <span className={`text-sm font-medium ${review.error ? 'text-red-600' : 'text-green-600'}`}>
-                    {review.error ? 'Error' : 'Complete'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="bg-white shadow-sm rounded-lg border">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-medium text-gray-900">Quick Actions</h2>
-              </div>
-              <div className="p-6 space-y-3">
-                <a 
-                  href={review.prUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="block w-full text-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Open PR in GitHub
-                </a>
-                <button
-                  onClick={() => navigator.clipboard.writeText(window.location.href)}
-                  className="block w-full text-center px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Copy Review Link
-                </button>
-              </div>
-            </div>
+        {/* Filter Controls */}
+        <div className="bg-white rounded-lg shadow p-4 mb-6">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">Filter by pass type:</span>
+            {passTypes.map(passType => (
+              <button
+                key={passType}
+                onClick={() => setSelectedPassType(passType)}
+                className={`px-3 py-1 rounded text-sm ${
+                  selectedPassType === passType
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {passType === 'all' ? 'All' : `${getPassTypeIcon(passType)} ${getPassTypeName(passType)}`}
+              </button>
+            ))}
           </div>
         </div>
+
+        {/* Chunk Analysis by File */}
+        <div className="space-y-6">
+          {Object.entries(fileGroups).map(([filePath, chunks]) => (
+            <div key={filePath} className="bg-white rounded-lg shadow">
+              <div className="p-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  {getFileIcon(filePath)} {filePath}
+                  <span className="text-sm font-normal text-gray-500">
+                    ({chunks.length} chunk{chunks.length !== 1 ? 's' : ''})
+                  </span>
+                </h3>
+              </div>
+              
+              <div className="divide-y divide-gray-200">
+                {chunks.map(chunk => (
+                  <div key={chunk.id} className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <h4 className="font-medium text-gray-900">
+                          Chunk {chunk.chunkId.slice(0, 8)}
+                        </h4>
+                        {chunk.startLine && chunk.endLine && (
+                          <span className="text-sm text-gray-500">
+                            Lines {chunk.startLine}-{chunk.endLine}
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-500">
+                          {chunk.sizeTokens} tokens
+                        </span>
+                        {chunk.isCompleteFile && (
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                            Complete File
+                          </span>
+                        )}
+                      </div>
+                      
+                      <button
+                        onClick={() => toggleChunkExpansion(chunk.id)}
+                        className="text-blue-600 hover:text-blue-800 text-sm"
+                      >
+                        {expandedChunks.has(chunk.id) ? 'Collapse' : 'Expand'}
+                      </button>
+                    </div>
+
+                    {/* Analysis Passes */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                      {chunk.analysisPasses
+                        .filter(pass => selectedPassType === 'all' || pass.passType === selectedPassType)
+                        .map(pass => (
+                        <div key={pass.id} className="border border-gray-200 rounded p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <h5 className="text-sm font-medium text-gray-900">
+                              {getPassTypeIcon(pass.passType)} {getPassTypeName(pass.passType)}
+                            </h5>
+                            <span className={getRiskBadge(pass.riskLevel)}>
+                              {pass.riskLevel}
+                            </span>
+                          </div>
+                          
+                          <div className="text-xs text-gray-500 mb-2">
+                            {pass.tokensUsed} tokens • {(pass.durationMs / 1000).toFixed(1)}s
+                          </div>
+                          
+                          {pass.issuesFound.length > 0 && (
+                            <div className="mb-2">
+                              <div className="text-xs font-medium text-red-700 mb-1">Issues ({pass.issuesFound.length})</div>
+                              <ul className="text-xs text-red-600 space-y-1">
+                                {pass.issuesFound.slice(0, 2).map((issue, index) => (
+                                  <li key={index}>• {issue}</li>
+                                ))}
+                                {pass.issuesFound.length > 2 && (
+                                  <li className="text-gray-500">...and {pass.issuesFound.length - 2} more</li>
+                                )}
+                              </ul>
+                            </div>
+                          )}
+                          
+                          {expandedChunks.has(chunk.id) && (
+                            <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
+                              <pre className="whitespace-pre-wrap">{pass.analysisResult}</pre>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Diff Content (when expanded) */}
+                    {expandedChunks.has(chunk.id) && (
+                      <div className="mt-4">
+                        <h5 className="text-sm font-medium text-gray-900 mb-2">Diff Content</h5>
+                        <pre className="text-xs bg-gray-900 text-gray-100 p-4 rounded overflow-x-auto">
+                          {chunk.diffContent}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Legacy File Analyses (if any) */}
+        {review.fileAnalyses && review.fileAnalyses.length > 0 && (
+          <div className="mt-8 bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">📁 Legacy File Analyses</h2>
+            <div className="space-y-4">
+              {review.fileAnalyses.map((fileAnalysis, index) => (
+                <div key={index} className="border border-gray-200 rounded p-4">
+                  <h3 className="font-medium text-gray-900 mb-2">{fileAnalysis.fileName}</h3>
+                  <pre className="text-sm text-gray-700 whitespace-pre-wrap">
+                    {fileAnalysis.analysis}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

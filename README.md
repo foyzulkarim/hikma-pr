@@ -1,206 +1,273 @@
-# hikma-pr
+# Hikmapr - AI-Powered Pull Request Review Agent
 
-A CLI tool for reviewing GitHub pull requests using local LLM models. Built with LangGraph for robust workflow management.
+A sophisticated CLI tool that provides intelligent, multi-pass analysis of GitHub Pull Requests using local LLMs.
 
-## Features
+## 🚀 Key Features
 
-- 📊 Automated PR analysis using LLM models
-- 🔄 Resumable workflows with state persistence
-- 📝 Comprehensive markdown reports with file-by-file analysis
-- ⚙️ **Configurable GitHub Access** - Choose between GitHub SDK or CLI upfront
-- 🔀 **Flexible LLM Provider Support** - Switch between Ollama, OpenAI, and LM Studio easily
-- 📺 **Real-time Streaming Response** - See AI analysis as it's generated
+### **Single API Call Architecture**
+- **Efficient**: Fetches entire PR diff in one `gh` CLI call
+- **Rate Limit Friendly**: No multiple API calls per file
+- **Local Processing**: All file extraction done locally after single fetch
 
-## LLM Provider Configuration
+### **Multi-Pass Analysis**
+- **4 Specialized Passes**: Syntax/Logic, Security/Performance, Architecture/Design, Testing/Docs
+- **Intelligent Chunking**: Recursive splitting with context preservation
+- **Smart Filtering**: Auto-detects project type and filters relevant files
+- **Hierarchical Synthesis**: Chunk → File → PR level analysis
 
-The service now supports multiple LLM providers with easy switching:
+### **Complete Tracking**
+- **Database Storage**: Every analysis pass saved with metadata
+- **Progress Monitoring**: Real-time progress with streaming responses
+- **Resume Capability**: Can resume interrupted analyses
+- **Report Generation**: Markdown reports with file-level details
 
-### Using Ollama (Default)
-```typescript
-// Uses default Ollama configuration
-const response = await analyzeFile(octokit, prUrl, filePath);
+### **Modern Web Dashboard**
+- **Real-time Progress**: Visual progress bars and completion tracking
+- **Risk Assessment**: Color-coded risk levels (LOW/MEDIUM/HIGH/CRITICAL)
+- **Interactive Analysis**: Expandable chunks with detailed pass results
+- **Decision Support**: Clear APPROVE/REQUEST_CHANGES/REJECT recommendations
+
+## 🛠️ Prerequisites
+
+Before you start, ensure you have these installed:
+
+### **Required Software**
+1. **Node.js 18+** - [Download here](https://nodejs.org/)
+2. **GitHub CLI (gh)** - [Installation guide](https://cli.github.com/)
+3. **Ollama** - [Download here](https://ollama.ai/) (for local LLM)
+
+### **Setup Steps**
+
+#### 1. Install and Configure GitHub CLI
+```bash
+# Install GitHub CLI (if not already installed)
+# macOS
+brew install gh
+# Windows
+winget install GitHub.cli
+# Linux
+sudo apt install gh
+
+# Authenticate with GitHub
+gh auth login
 ```
 
-### Switching to OpenAI
-```typescript
-import { createLLMClient } from './src/services/llmService';
-
-// Create OpenAI client
-const openaiClient = createLLMClient({
-  provider: 'openai',
-  baseUrl: 'https://api.openai.com',
-  model: 'gpt-4',
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-// Use with streaming
-const response = await openaiClient.generate(prompt, {
-  onData: (chunk) => console.log(chunk),
-  onComplete: (full) => console.log('Complete:', full)
-});
+#### 2. Install and Start Ollama
+```bash
+# Download and install Ollama from https://ollama.ai/
+# Then pull the required model
+ollama pull gemma2:2b
+# or for faster analysis (smaller model)
+ollama pull gemma2:1b
 ```
 
-### Using LM Studio
-```typescript
-import { createLLMClient } from './src/services/llmService';
+#### 3. Verify Prerequisites
+```bash
+# Check Node.js version (should be 18+)
+node --version
 
-// LM Studio setup (OpenAI-compatible API)
-const lmstudioClient = createLLMClient({
-  provider: 'lmstudio',
-  baseUrl: 'http://localhost:1234',
-  model: 'qwen/qwen3-4b' // or any model loaded in LM Studio
-});
+# Check GitHub CLI is authenticated
+gh auth status
 
-// Use with streaming
-const response = await lmstudioClient.generate(prompt, {
-  onData: (chunk) => process.stdout.write(chunk),
-  onComplete: (full) => console.log('\n✅ Complete!')
-});
+# Check Ollama is running
+ollama list
 ```
 
-### Custom Ollama Configuration
-```typescript
-import { createLLMClient } from './src/services/llmService';
+## 🔧 Configuration
 
-// Custom Ollama setup
-const customClient = createLLMClient({
-  provider: 'ollama',
-  baseUrl: 'http://custom-ollama-server:11434',
-  model: 'codestral:latest'
-});
+### **LLM Models**
+Configure in `src/graph/workflow.ts`:
+
+```typescript
+const DEFAULT_CONFIG: AnalysisConfig = {
+  models: {
+    syntax_logic: { name: 'gemma2:2b', provider: 'ollama' },
+    security_performance: { name: 'gemma2:2b', provider: 'ollama' },
+    architecture_design: { name: 'gemma2:2b', provider: 'ollama' },
+    testing_docs: { name: 'gemma2:2b', provider: 'ollama' }
+  }
+}
 ```
 
-## Installation
+### **Project Detection**
+Automatically detects and filters files for:
+- **JavaScript/TypeScript**: React, Next.js, Node.js, Vue, Angular
+- **Python**: Django, Flask, FastAPI, general Python
+- **Java**: Spring Boot, Maven, Gradle projects
+- **Go**: Go modules and packages
+- **C#**: .NET, ASP.NET projects
+- **PHP**: Laravel, Symfony projects
+
+## 📋 Installation & Quick Start
+
+### **Step 1: Clone and Install**
+```bash
+# Clone the repository
+git clone https://github.com/foyzulkarim/hikma-pr.git
+cd hikma-pr
+
+# Install dependencies
+npm install
+
+# Set up database
+npm run db:migrate
+```
+
+### **Step 2: First Analysis**
+```bash
+# Analyze any public GitHub PR
+npm run dev -- review https://github.com/foyzulkarim/hikma/pull/1
+
+# Or build and run
+npm run build
+npm start review https://github.com/foyzulkarim/hikma/pull/1
+```
+
+### **Step 3: Launch Web Dashboard (Optional)**
+```bash
+# In a new terminal window
+cd hikma-pr-gui
+npm install
+
+# Set up database (sync schema and generate Prisma client)
+npm run db:generate
+
+# Start the development server
+npm run dev
+
+# Visit http://localhost:3000 to see the dashboard
+```
+
+> **Note:** If you encounter database errors, see [hikma-pr-gui/DATABASE.md](./hikma-pr-gui/DATABASE.md) for detailed setup instructions.
+
+
+## 📊 Example Output
 
 ```bash
-git clone https://github.com/your-username/hikma-pr.git
-cd hikma-pr
-npm install
+🚀 Starting Hikmapr Multi-Pass Analysis
+📝 Task ID: abc123def
+🔗 PR URL: https://github.com/owner/repo/pull/123
+🔬 Using Advanced Multi-Pass Analysis Architecture
+
+✅ Single API call completed - all file diffs cached locally
+📊 Found 5 analyzable files (filtered from 12 total files)
+🔄 Processing chunks: ████████████████████ 100% (20/20)
+
+🔬 Analysis Progress:
+├── 📄 src/components/Button.tsx
+│   ├── 🔍 Syntax & Logic: ✅ LOW risk (2.1s)
+│   ├── 🔒 Security & Performance: ✅ LOW risk (1.8s)
+│   ├── 🏗️ Architecture & Design: ⚠️ MEDIUM risk (2.3s)
+│   └── 📋 Testing & Documentation: ❌ HIGH risk (1.9s)
+├── 📄 src/utils/api.ts
+│   ├── 🔍 Syntax & Logic: ✅ LOW risk (1.5s)
+│   ├── 🔒 Security & Performance: 🚨 CRITICAL risk (2.7s)
+│   └── ... (analysis continues)
+
+📊 Final Summary:
+├── 🟢 LOW: 12 issues
+├── 🟡 MEDIUM: 5 issues  
+├── 🟠 HIGH: 3 issues
+└── 🔴 CRITICAL: 1 issue
+
+🎯 Recommendation: REQUEST_CHANGES
+📄 Report saved: reports/owner-repo-PR123-2024-01-15-abc123def.md
+🌐 View in dashboard: http://localhost:3000/review/abc123def
+```
+
+## 🛠️ Development Scripts
+
+Quick reference for development tasks:
+
+```bash
+# Show all available scripts with descriptions
+npm run help
+
+# Development workflow
+npm run dev          # Run in development mode (hot reload)
+npm run build        # Build TypeScript to JavaScript
+npm start           # Run the built application
+
+# Database management
+npm run db:generate  # Generate Prisma client after schema changes
+npm run db:migrate   # Create and apply new migration
+npm run db:deploy    # Apply existing migrations (production)
+npm run db:studio    # Open database GUI
+npm run db:status    # Check migration status
+```
+
+For detailed explanations of each script, see [SCRIPTS.md](./SCRIPTS.md) or run `npm run help`.
+
+## 🗃️ Database Schema
+
+Tracks comprehensive analysis data:
+- **Reviews**: PR metadata and final reports
+- **ChunkAnalysis**: Individual chunks with context
+- **AnalysisPass**: All 4 passes per chunk with risk levels
+- **FileAnalysis**: Legacy file-level analyses
+
+
+## 🚨 Troubleshooting
+
+### **Common Issues**
+
+#### "gh: command not found"
+```bash
+# Install GitHub CLI
+brew install gh  # macOS
+# or visit https://cli.github.com/
+```
+
+#### "ollama: command not found"
+```bash
+# Install Ollama from https://ollama.ai/
+# Then pull a model
+ollama pull gemma2:2b
+```
+
+#### "Database connection error"
+```bash
+# Reset database
+npm run db:reset
+npm run db:migrate
+```
+
+#### "Build errors after updates"
+```bash
+# Clean and rebuild
+npm run db:generate
 npm run build
 ```
 
-## Setup
+### **Getting Help**
+- 📖 Read [SCRIPTS.md](./SCRIPTS.md) for detailed script explanations
+- 🗄️ Read [hikma-pr-gui/DATABASE.md](./hikma-pr-gui/DATABASE.md) for GUI database issues
+- 🐛 [Open an issue](https://github.com/foyzulkarim/hikma-pr/issues) for bugs
+- 💬 [Start a discussion](https://github.com/foyzulkarim/hikma-pr/discussions) for questions
 
-1. **Choose GitHub Interaction Method**:
-   
-   Edit `src/index.ts` and set your preferred method:
-   ```typescript
-   // CONFIGURATION: Change this to choose your GitHub interaction method
-   const GITHUB_METHOD: GitHubMethod = 'cli'; // 👈 'sdk' or 'cli'
-   ```
-   
-   **Options:**
-   - `'sdk'` = Uses GitHub SDK (Octokit) - requires GITHUB_TOKEN, subject to rate limits
-   - `'cli'` = Uses GitHub CLI (gh) - requires gh authentication, no rate limits
+## 🎯 Why This Architecture?
 
-2. **Set up GitHub Authentication**:
-   
-   **For SDK method:**
-   ```bash
-   export GITHUB_TOKEN="your_github_token_here"
-   ```
-   
-   **For CLI method:**
-   ```bash
-   # Install and authenticate gh CLI
-   gh auth login
-   ```
+1. **Rate Limit Safe**: Single API call vs. N calls per file
+2. **Efficient**: Local processing after single fetch
+3. **Resilient**: Database checkpointing and resume capability
+4. **Comprehensive**: 4-pass analysis with risk assessment
+5. **User Friendly**: No API keys, uses `gh` CLI authentication
 
-3. **Install Ollama** (if using default provider):
-   ```bash
-   # Install Ollama
-   curl -fsSL https://ollama.ai/install.sh | sh
-   
-   # Pull the required models
-   ollama pull llama3.2:3b-instruct-fp16
-   ollama pull gemma2:27b-instruct-q8_0
-   ```
+Perfect for teams wanting thorough PR analysis without API rate limiting concerns.
 
-4. **Install LM Studio** (optional alternative to Ollama):
-   - Download from [LM Studio](https://lmstudio.ai/)
-   - Load a model (e.g., qwen/qwen3-4b)
-   - Start the server (runs on port 1234 by default)
-   - Check status: `lms status`
+## 🤝 Contributing
 
-5. **Set up environment variables**:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your GitHub token and other settings
-   ```
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes and test thoroughly
+4. Commit your changes: `git commit -m 'Add amazing feature'`
+5. Push to the branch: `git push origin feature/amazing-feature`
+6. Open a Pull Request
 
-6. **Initialize database**:
-   ```bash
-   npm run prisma:migrate
-   ```
+## 📄 License
 
-## Usage
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### Basic PR Review
-```bash
-# Review a PR
-./dist/index.js review https://github.com/owner/repo/pull/123
+---
 
-# Resume a previous review
-./dist/index.js resume <task-id>
-
-# Generate reports
-./dist/index.js reports
-```
-
-### With Custom LLM Provider
-Set environment variables:
-
-**For OpenAI:**
-```bash
-export LLM_PROVIDER=openai
-export LLM_BASE_URL=https://api.openai.com
-export LLM_MODEL=gpt-4
-export LLM_API_KEY=your-openai-key
-```
-
-**For LM Studio:**
-```bash
-export LLM_PROVIDER=lmstudio
-export LLM_BASE_URL=http://localhost:1234
-export LLM_MODEL=qwen/qwen3-4b
-# No API key needed for LM Studio
-```
-
-## Architecture
-
-- **LangGraph**: Manages stateful workflow execution
-- **Prisma**: Handles data persistence and state management
-- **Axios**: Generic HTTP client for LLM API calls (replaces provider-specific SDKs)
-- **Streaming Support**: Real-time response display with `onData` handlers
-
-## Technical Benefits
-
-### 🔄 Provider Flexibility
-- Easy switching between Ollama, OpenAI, LM Studio, and future providers
-- No vendor lock-in - uses standard HTTP APIs
-- Configuration-driven provider selection
-- Support for both local (Ollama, LM Studio) and cloud (OpenAI) providers
-
-### 📺 Streaming Response
-- Real-time output as LLM generates response
-- Better user experience with immediate feedback
-- Configurable streaming handlers for different use cases
-
-### 🛠 Maintainable Code
-- Single HTTP client (axios) instead of multiple SDKs
-- Consistent error handling across providers
-- Easier testing and debugging
-
-## Examples
-
-Check the `examples/` directory for usage examples:
-- `examples/lmstudio-example.ts` - Complete LM Studio integration example with streaming
-
-Run the LM Studio example:
-```bash
-npx ts-node examples/lmstudio-example.ts
-```
-
-## License
-
-ISC
+⭐ **Star this repo if you find it helpful!** ⭐
