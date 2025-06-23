@@ -3,6 +3,166 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import parse from 'parse-diff'
+
+// Custom side-by-side diff viewer
+const SideBySideDiff = ({ diffContent }: { diffContent: string }) => {
+  const files = parse(diffContent);
+  if (!files.length || !files[0] || !files[0].chunks || !files[0].chunks.length) {
+    return (
+      <div className="bg-gray-900 rounded-lg overflow-hidden">
+        <pre className="text-sm text-gray-100 p-4 overflow-x-auto leading-relaxed">
+          {diffContent}
+        </pre>
+      </div>
+    );
+  }
+
+  const file = files[0];
+
+  // Process chunks to create line-by-line comparison
+  const lines: { left?: { number: number; content: string; type?: string }; right?: { number: number; content: string; type?: string } }[] = [];
+  
+  file.chunks.forEach((chunk: any) => {
+    let leftLine = chunk.oldStart;
+    let rightLine = chunk.newStart;
+
+    chunk.changes.forEach((change: any) => {
+      if (change.type === 'normal') {
+        lines.push({
+          left: { number: leftLine++, content: change.content.substring(1) },
+          right: { number: rightLine++, content: change.content.substring(1) },
+        });
+      } else if (change.type === 'del') {
+        lines.push({
+          left: { number: leftLine++, content: change.content.substring(1), type: 'del' },
+        });
+      } else if (change.type === 'add') {
+        lines.push({
+          right: { number: rightLine++, content: change.content.substring(1), type: 'add' },
+        });
+      }
+    });
+  });
+
+  return (
+    <div className="font-mono text-xs border border-gray-700 rounded-lg bg-gray-900 text-gray-200">
+      <table className="w-full border-collapse">
+        <colgroup>
+          <col style={{ width: '50px' }} />
+          <col />
+          <col style={{ width: '50px' }} />
+          <col />
+        </colgroup>
+        <tbody>
+          {lines.map((line, index) => (
+            <tr key={index}>
+              <td className={`pl-2 pr-2 text-right text-gray-500 ${line.left ? 'border-r border-gray-700' : ''} ${line.left?.type === 'del' ? 'bg-red-900/20' : ''}`}>
+                {line.left?.number}
+              </td>
+              <td className={`pl-4 ${line.left?.type === 'del' ? 'bg-red-900/20' : ''}`}>
+                <pre className="whitespace-pre-wrap">{line.left?.content}</pre>
+              </td>
+              <td className={`pl-2 pr-2 text-right text-gray-500 ${line.right ? 'border-r border-gray-700' : ''} ${line.right?.type === 'add' ? 'bg-green-900/20' : ''}`}>
+                {line.right?.number}
+              </td>
+              <td className={`pl-4 ${line.right?.type === 'add' ? 'bg-green-900/20' : ''}`}>
+                <pre className="whitespace-pre-wrap">{line.right?.content}</pre>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+// Simple markdown-to-JSX renderer for analysis results
+const MarkdownRenderer = ({ content }: { content: string }) => {
+  const renderMarkdown = (text: string) => {
+    const lines = text.split('\n')
+    const elements: React.ReactElement[] = []
+    let currentList: string[] = []
+    let listKey = 0
+
+    const flushList = () => {
+      if (currentList.length > 0) {
+        elements.push(
+          <ul key={`list-${listKey++}`} className="list-disc list-inside space-y-1 mb-4 ml-4">
+            {currentList.map((item, index) => (
+              <li key={index} className="text-gray-700">
+                {renderInlineMarkdown(item.replace(/^[-*]\s+/, ''))}
+              </li>
+            ))}
+          </ul>
+        )
+        currentList = []
+      }
+    }
+
+    const renderInlineMarkdown = (text: string) => {
+      // Handle bold text **text**
+      const boldRegex = /\*\*(.*?)\*\*/g
+      const parts = text.split(boldRegex)
+      
+      return parts.map((part, index) => {
+        if (index % 2 === 1) {
+          return <strong key={index} className="font-semibold text-gray-900">{part}</strong>
+        }
+        return part
+      })
+    }
+
+    lines.forEach((line, index) => {
+      line = line.trim()
+      
+      if (!line) {
+        flushList()
+        elements.push(<div key={`br-${index}`} className="mb-2"></div>)
+        return
+      }
+
+      // Headers
+      if (line.startsWith('## ')) {
+        flushList()
+        elements.push(
+          <h3 key={index} className="text-lg font-semibold text-gray-900 mt-6 mb-3 border-b border-gray-200 pb-1">
+            {line.replace('## ', '')}
+          </h3>
+        )
+      } else if (line.startsWith('### ')) {
+        flushList()
+        elements.push(
+          <h4 key={index} className="text-base font-semibold text-gray-800 mt-4 mb-2">
+            {line.replace('### ', '')}
+          </h4>
+        )
+      }
+      // List items
+      else if (line.match(/^[-*]\s+/)) {
+        currentList.push(line)
+      }
+      // Regular paragraphs
+      else {
+        flushList()
+        elements.push(
+          <p key={index} className="text-gray-700 mb-3 leading-relaxed">
+            {renderInlineMarkdown(line)}
+          </p>
+        )
+      }
+    })
+
+    flushList()
+    return elements
+  }
+
+  return (
+    <div className="prose prose-sm max-w-none">
+      {renderMarkdown(content)}
+    </div>
+  )
+}
 
 interface AnalysisPass {
   id: string
@@ -367,10 +527,8 @@ export default function ReviewDetail() {
         {review.state.final_report && (
           <div className="bg-white rounded-lg shadow p-6 mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">📊 Final Analysis Report</h2>
-            <div className="prose max-w-none">
-              <pre className="whitespace-pre-wrap text-sm text-gray-700 bg-gray-50 p-4 rounded">
-                {review.state.final_report}
-              </pre>
+            <div className="bg-gray-50 p-4 rounded">
+              <MarkdownRenderer content={review.state.final_report} />
             </div>
           </div>
         )}
@@ -459,7 +617,10 @@ export default function ReviewDetail() {
               <div className="divide-y divide-gray-200">
                 {chunks.map(chunk => (
                   <div key={chunk.id} className="p-4">
-                    <div className="flex items-center justify-between mb-3">
+                    <div 
+                      className="flex items-center justify-between cursor-pointer"
+                      onClick={() => toggleChunkExpansion(chunk.id)}
+                    >
                       <div className="flex items-center gap-3">
                         <h4 className="font-medium text-gray-900">
                           Chunk {chunk.chunkId.slice(0, 8)}
@@ -478,64 +639,51 @@ export default function ReviewDetail() {
                           </span>
                         )}
                       </div>
-                      
-                      <button
-                        onClick={() => toggleChunkExpansion(chunk.id)}
-                        className="text-blue-600 hover:text-blue-800 text-sm"
-                      >
-                        {expandedChunks.has(chunk.id) ? 'Collapse' : 'Expand'}
+                      <button className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1">
+                        {expandedChunks.has(chunk.id) ? 'Hide' : 'Show'} Details
+                        <svg 
+                          className={`w-4 h-4 transition-transform ${expandedChunks.has(chunk.id) ? 'rotate-180' : ''}`}
+                          fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
                       </button>
                     </div>
 
-                    {/* Analysis Passes */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                      {chunk.analysisPasses
-                        .filter(pass => selectedPassType === 'all' || pass.passType === selectedPassType)
-                        .map(pass => (
-                        <div key={pass.id} className="border border-gray-200 rounded p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <h5 className="text-sm font-medium text-gray-900">
-                              {getPassTypeIcon(pass.passType)} {getPassTypeName(pass.passType)}
-                            </h5>
-                            <span className={getRiskBadge(pass.riskLevel)}>
-                              {pass.riskLevel}
-                            </span>
-                          </div>
-                          
-                          <div className="text-xs text-gray-500 mb-2">
-                            {pass.tokensUsed} tokens • {(pass.durationMs / 1000).toFixed(1)}s
-                          </div>
-                          
-                          {pass.issuesFound.length > 0 && (
-                            <div className="mb-2">
-                              <div className="text-xs font-medium text-red-700 mb-1">Issues ({pass.issuesFound.length})</div>
-                              <ul className="text-xs text-red-600 space-y-1">
-                                {pass.issuesFound.slice(0, 2).map((issue, index) => (
-                                  <li key={index}>• {issue}</li>
-                                ))}
-                                {pass.issuesFound.length > 2 && (
-                                  <li className="text-gray-500">...and {pass.issuesFound.length - 2} more</li>
-                                )}
-                              </ul>
-                            </div>
-                          )}
-                          
-                          {expandedChunks.has(chunk.id) && (
-                            <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                              <pre className="whitespace-pre-wrap">{pass.analysisResult}</pre>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Diff Content (when expanded) */}
                     {expandedChunks.has(chunk.id) && (
-                      <div className="mt-4">
-                        <h5 className="text-sm font-medium text-gray-900 mb-2">Diff Content</h5>
-                        <pre className="text-xs bg-gray-900 text-gray-100 p-4 rounded overflow-x-auto">
-                          {chunk.diffContent}
-                        </pre>
+                      <div className="flex flex-col gap-6 mt-4">
+                        {/* TOP: Diff Content */}
+                        <div>
+                          <h5 className="text-base font-medium text-gray-900 mb-3">📄 Diff Content</h5>
+                          <SideBySideDiff diffContent={chunk.diffContent} />
+                        </div>
+
+                        {/* BOTTOM: Analysis Passes */}
+                        <div>
+                          <h5 className="text-base font-medium text-gray-900 mb-3">🔬 Analysis Passes</h5>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {chunk.analysisPasses
+                              .filter(pass => selectedPassType === 'all' || pass.passType === selectedPassType)
+                              .map(pass => (
+                              <div key={pass.id} className="border border-gray-200 rounded p-4 bg-gray-50 h-full">
+                                <div className="flex items-center justify-between mb-4">
+                                  <h5 className="text-base font-medium text-gray-900">
+                                    {getPassTypeIcon(pass.passType)} {getPassTypeName(pass.passType)}
+                                  </h5>
+                                  <div className="flex items-center gap-2">
+                                    <span className={getRiskBadge(pass.riskLevel)}>
+                                      {pass.riskLevel}
+                                    </span>
+                                    <span className="text-xs text-gray-500">
+                                      {pass.tokensUsed} tokens • {(pass.durationMs / 1000).toFixed(1)}s
+                                    </span>
+                                  </div>
+                                </div>
+                                <MarkdownRenderer content={pass.analysisResult} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
