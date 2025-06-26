@@ -25,9 +25,17 @@ model Review {
   completedAt   DateTime? // When analysis completed
   
   // Relationships
-  fileAnalyses   FileAnalysis[]
-  chunkAnalyses  ChunkAnalysis[]
-  analysisPasses AnalysisPass[]
+  fileAnalyses       FileAnalysis[]
+  chunkAnalyses      ChunkAnalysis[]
+  analysisPasses     AnalysisPass[]
+  
+  // Enhanced comprehensive analysis relationships
+  findings           Finding[]
+  recommendations    Recommendation[]
+  repositoryContext  RepositoryContext?
+  semanticAnalysis   SemanticAnalysis?
+  agentAnalyses      AgentAnalysis[]
+  qualityValidation  QualityValidation?
 }
 
 model FileAnalysis {
@@ -83,4 +91,98 @@ model AnalysisPass {
   chunk           ChunkAnalysis @relation(fields: [chunkId], references: [chunkId], onDelete: Cascade)
   
   @@unique([chunkId, passType]) // Ensure one pass of each type per chunk
+}
+
+// Enhanced models for comprehensive analysis system
+model Finding {
+  id          String   @id
+  reviewId    String
+  type        String
+  severity    String   // low, medium, high, critical
+  message     String
+  file        String
+  lineNumber  Int?
+  evidence    Json     // Array of evidence strings
+  createdAt   DateTime @default(now())
+  
+  // Relationships
+  review      Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+}
+
+model Recommendation {
+  id             String   @id
+  reviewId       String
+  priority       String   // must-fix, should-fix, consider
+  category       String
+  description    String
+  rationale      String
+  implementation String
+  effort         String   // low, medium, high
+  createdAt      DateTime @default(now())
+  
+  // Relationships
+  review         Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+}
+
+model RepositoryContext {
+  id                    String   @id @default(cuid())
+  reviewId              String   @unique
+  repoUrl               String
+  repoPath              String
+  changedFiles          Json     // Array of changed file paths
+  codebaseMap           Json     // Codebase structure and metrics
+  architecturalPatterns Json     // Array of detected patterns
+  historicalPatterns    Json     // Array of historical patterns
+  dependencyGraph       Json     // Dependency graph data
+  qualityMetrics        Json     // Quality metrics
+  createdAt             DateTime @default(now())
+  
+  // Relationships
+  review                Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+}
+
+model SemanticAnalysis {
+  id                  String   @id @default(cuid())
+  reviewId            String   @unique
+  functionSignatures  Json     // Array of function signatures
+  typeDefinitions     Json     // Array of type definitions
+  importExportChains  Json     // Array of import/export chains
+  callGraphs          Json     // Array of call graph data
+  dataFlows           Json     // Array of data flow information
+  createdAt           DateTime @default(now())
+  
+  // Relationships
+  review              Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+}
+
+model AgentAnalysis {
+  id            String   @id @default(cuid())
+  reviewId      String
+  agentType     String   // architectural, security, performance, testing
+  findings      Json     // Array of findings from this agent
+  recommendations Json   // Array of recommendations from this agent
+  riskLevel     String   // LOW, MEDIUM, HIGH, CRITICAL
+  confidence    Float    // Confidence score 0.0-1.0
+  metadata      Json     // Additional agent-specific metadata
+  createdAt     DateTime @default(now())
+  
+  // Relationships
+  review        Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  
+  @@unique([reviewId, agentType]) // One analysis per agent type per review
+}
+
+model QualityValidation {
+  id                String   @id @default(cuid())
+  reviewId          String   @unique
+  completenessScore Float
+  consistencyScore  Float
+  actionabilityScore Float
+  evidenceScore     Float
+  overallScore      Float
+  validationIssues  Json     // Array of validation issues found
+  createdAt         DateTime @default(now())
+  
+  // Relationships
+  review            Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
 }

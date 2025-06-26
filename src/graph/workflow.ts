@@ -30,7 +30,7 @@ const LMS_QWEN25_CODER_14B = 'qwen2.5-coder-14b-instruct-mlx';
 const LMS_QWEN25_CODER_32B = 'qwen2.5-coder-32b-instruct-mlx';
 const LMS_GEMMA_3_1B = 'google/gemma-3-1b';
 
-const SELECTED_MODEL = LMS_QWEN25_CODER_32B;
+const SELECTED_MODEL = LMS_GEMMA_3_1B;
 
 const URLS = {
   OLLAMA: 'http://localhost:11434',

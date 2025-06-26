@@ -4,8 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "help": "node -e \"console.log('\\n📋 Available Scripts:\\n'); console.log('🔨 Development:'); console.log('  npm run dev          - Run app in development mode (with hot reload)'); console.log('  npm run build        - Build TypeScript to JavaScript'); console.log('  npm start            - Run the built application'); console.log('\\n🗄️  Database (Prisma):'); console.log('  npm run db:generate  - Generate Prisma client after schema changes'); console.log('  npm run db:migrate   - Create and apply new database migration'); console.log('  npm run db:deploy    - Apply existing migrations (for production)'); console.log('  npm run db:reset     - Reset database (⚠️  deletes all data)'); console.log('  npm run db:studio    - Open Prisma Studio (database GUI)'); console.log('  npm run db:status    - Check migration status'); console.log('\\n🧪 Testing:'); console.log('  npm test             - Run tests (not implemented yet)'); console.log('\\n💡 Run \\'npm run help\\' anytime to see this menu\\n');\"",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "help": "node -e \"console.log('\\n📋 Available Scripts:\\n'); console.log('🔨 Development:'); console.log('  npm run dev          - Run app in development mode (with hot reload)'); console.log('  npm run build        - Build TypeScript to JavaScript'); console.log('  npm start            - Run the built application'); console.log('\\n🗄️  Database (Prisma):'); console.log('  npm run db:generate  - Generate Prisma client after schema changes'); console.log('  npm run db:migrate   - Create and apply new database migration'); console.log('  npm run db:deploy    - Apply existing migrations (for production)'); console.log('  npm run db:reset     - Reset database (⚠️  deletes all data)'); console.log('  npm run db:studio    - Open Prisma Studio (database GUI)'); console.log('  npm run db:status    - Check migration status'); console.log('\\n🧪 Testing:'); console.log('  npm test             - Run tests (not implemented yet)'); console.log('  npm run test:llm     - Test local LLM connections'); console.log('\\n💡 Run \\'npm run help\\' anytime to see this menu\\n');\"",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:simple": "jest tests/unit/simple.test.ts",
+    "test:llm": "node test-universal-llm.js",
     "build": "prisma generate && tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
@@ -35,18 +39,28 @@
   },
   "homepage": "https://github.com/foyzulkarim/hikma-pr#readme",
   "dependencies": {
+    "@babel/parser": "^7.27.5",
     "@langchain/langgraph": "^0.3.4",
     "@prisma/client": "^6.10.0",
+    "@typescript-eslint/parser": "^8.35.0",
     "axios": "^1.7.7",
     "chalk": "^5.4.1",
     "commander": "^14.0.0",
+    "dotenv": "^16.5.0",
     "octokit": "^5.0.3",
     "ora": "^8.2.0",
+    "simple-git": "^3.28.0",
+    "tree-sitter": "^0.25.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@jest/globals": "^30.0.3",
+    "@types/dotenv": "^6.1.1",
+    "@types/jest": "^30.0.0",
     "@types/node": "^24.0.3",
+    "jest": "^30.0.3",
     "prisma": "^6.10.0",
+    "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   }
