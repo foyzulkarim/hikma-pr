@@ -128,7 +128,12 @@ Both applications use the same SQLite database:
 ~/.hikmapr/reviews.db
 ```
 
-This ensures data consistency between the CLI tool and the GUI dashboard.
+The database location is now automatically configured to use the user's home directory with a `.hikmapr` folder. This ensures:
+- Data consistency between the CLI tool and the GUI dashboard
+- Proper data persistence when running via npx
+- Cross-platform compatibility (works on Windows, macOS, and Linux)
+
+The database path is dynamically set using the `DATABASE_URL` environment variable, which defaults to `file:~/.hikmapr/reviews.db` but can be overridden if needed.
 
 ## 💡 Pro Tips
 

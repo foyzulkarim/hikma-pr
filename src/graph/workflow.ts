@@ -43,44 +43,44 @@ const SELECTED_PROVIDER = {
 };
 
 // Default configuration
-export const DEFAULT_CONFIG: AnalysisConfig = {
-  models: {
-    syntax_logic: {
-      name: SELECTED_MODEL,
-      provider: SELECTED_PROVIDER.NAME,
-      base_url: SELECTED_PROVIDER.BASE_URL,
-      max_tokens: 8000,
-      temperature: 0.1
-    },
-    security_performance: {
-      name: SELECTED_MODEL,
-      provider: SELECTED_PROVIDER.NAME,
-      base_url: SELECTED_PROVIDER.BASE_URL,
-      max_tokens: 8000,
-      temperature: 0.1
-    },
-    architecture_design: {
-      name: SELECTED_MODEL,
-      provider: SELECTED_PROVIDER.NAME,
-      base_url: SELECTED_PROVIDER.BASE_URL,
-      max_tokens: 8000,
-      temperature: 0.1
-    },
-    testing_docs: {
-      name: SELECTED_MODEL,
-      provider: SELECTED_PROVIDER.NAME,
-      base_url: SELECTED_PROVIDER.BASE_URL,
-      max_tokens: 8000,
-      temperature: 0.1
-    },
-    synthesis: {
-      name: SELECTED_MODEL,
-      provider: SELECTED_PROVIDER.NAME,
-      base_url: SELECTED_PROVIDER.BASE_URL,
-      max_tokens: 8000,
-      temperature: 0.3
-    }
-  },
+export const DEFAULT_CONFIG = {
+  // models: {
+  //   syntax_logic: {
+  //     name: "", // Will be set dynamically
+  //     provider: "lmstudio", // Default provider, can be overridden
+  //     base_url: "", // Will be set dynamically
+  //     max_tokens: 8000,
+  //     temperature: 0.1
+  //   },
+  //   security_performance: {
+  //     name: "", // Will be set dynamically
+  //     provider: "lmstudio",
+  //     base_url: "",
+  //     max_tokens: 8000,
+  //     temperature: 0.1
+  //   },
+  //   architecture_design: {
+  //     name: "", // Will be set dynamically
+  //     provider: "lmstudio",
+  //     base_url: "",
+  //     max_tokens: 8000,
+  //     temperature: 0.1
+  //   },
+  //   testing_docs: {
+  //     name: "", // Will be set dynamically
+  //     provider: "lmstudio",
+  //     base_url: "",
+  //     max_tokens: 8000,
+  //     temperature: 0.1
+  //   },
+  //   synthesis: {
+  //     name: "", // Will be set dynamically
+  //     provider: "lmstudio",
+  //     base_url: "",
+  //     max_tokens: 8000,
+  //     temperature: 0.3
+  //   }
+  // },
   project: {
     language: 'typescript',
     file_extensions: ['.ts', '.tsx', '.js', '.jsx'],
@@ -104,12 +104,11 @@ let prisma: PrismaClient;
 /**
  * Initialize services
  */
-function initializeServices(config: AnalysisConfig = DEFAULT_CONFIG) {
+function initializeServices(config: Partial<AnalysisConfig>) {
   fileFilterService = new FileFilterService(config.project);
-  chunkService = new ChunkService(config.project);
-  analysisService = new AnalysisService(config);
+  chunkService = new ChunkService(config.project || {});
+  analysisService = new AnalysisService(config as AnalysisConfig);
   prisma = new PrismaClient();
-  
   console.log(chalk.blue(`🚀 Enhanced workflow services initialized`));
 }
 
@@ -119,7 +118,7 @@ function initializeServices(config: AnalysisConfig = DEFAULT_CONFIG) {
 const shouldContinueFileProcessing = (state: ReviewState) => {
   const remaining = state.files_to_process?.length || 0;
   console.log(chalk.blue(`🔀 File processing decision: ${remaining} files remaining`));
-  
+
   if (remaining > 0) {
     console.log(chalk.yellow(`➡️  Processing next file: ${state.files_to_process![0]}`));
     return "setupFileChunks";
@@ -131,7 +130,7 @@ const shouldContinueFileProcessing = (state: ReviewState) => {
 const shouldContinueChunkProcessing = (state: ReviewState) => {
   const remaining = state.chunks_to_process?.length || 0;
   console.log(chalk.blue(`🔀 Chunk processing decision: ${remaining} chunks remaining`));
-  
+
   if (remaining > 0) {
     console.log(chalk.yellow(`➡️  Processing next chunk: ${state.chunks_to_process![0].id.slice(0, 8)}`));
     return "analyzeChunk";
@@ -146,47 +145,47 @@ const workflow = new StateGraph<ReviewState>({
     // Core identification
     pr_url: { value: (x: any, y: any) => y, default: () => "" },
     task_id: { value: (x: any, y: any) => y, default: () => "" },
-    
+
     // Context establishment
     pr_details: { value: (x: any, y: any) => y, default: () => undefined },
     pr_context: { value: (x: any, y: any) => y, default: () => undefined },
-    
+
     // File processing
     all_changed_files: { value: (x: any, y: any) => y, default: () => [] },
     filtered_files: { value: (x: any, y: any) => y, default: () => [] },
     files_to_process: { value: (x: any, y: any) => y, default: () => [] },
     current_file: { value: (x: any, y: any) => y, default: () => undefined },
-    
+
     // Full diff (fetched once)
     full_pr_diff: { value: (x: any, y: any) => y, default: () => undefined },
-    
+
     // Chunk processing
-    file_chunks: { 
-      value: (existing: any, update: any) => ({ ...(existing || {}), ...(update || {}) }), 
-      default: () => ({}) 
+    file_chunks: {
+      value: (existing: any, update: any) => ({ ...(existing || {}), ...(update || {}) }),
+      default: () => ({})
     },
     current_chunks: { value: (x: any, y: any) => y, default: () => [] },
     chunks_to_process: { value: (x: any, y: any) => y, default: () => [] },
     current_chunk: { value: (x: any, y: any) => y, default: () => undefined },
     current_pass: { value: (x: any, y: any) => y, default: () => undefined },
-    
+
     // Analysis results
-    chunk_analyses: { 
-      value: (existing: any, update: any) => ({ ...(existing || {}), ...(update || {}) }), 
-      default: () => ({}) 
+    chunk_analyses: {
+      value: (existing: any, update: any) => ({ ...(existing || {}), ...(update || {}) }),
+      default: () => ({})
     },
-    file_results: { 
-      value: (existing: any, update: any) => ({ ...(existing || {}), ...(update || {}) }), 
-      default: () => ({}) 
+    file_results: {
+      value: (existing: any, update: any) => ({ ...(existing || {}), ...(update || {}) }),
+      default: () => ({})
     },
-    
+
     // Final synthesis
     synthesis_data: { value: (x: any, y: any) => y, default: () => undefined },
     final_report: { value: (x: any, y: any) => y, default: () => undefined },
-    
+
     // Progress tracking
-    progress: { 
-      value: (existing: any, update: any) => ({ ...(existing || {}), ...(update || {}) }), 
+    progress: {
+      value: (existing: any, update: any) => ({ ...(existing || {}), ...(update || {}) }),
       default: () => ({
         total_files: 0,
         completed_files: 0,
@@ -194,7 +193,7 @@ const workflow = new StateGraph<ReviewState>({
         completed_chunks: 0,
         total_passes: 0,
         completed_passes: 0
-      }) 
+      })
     }
   }
 });
@@ -203,15 +202,16 @@ const workflow = new StateGraph<ReviewState>({
  * Node 1: Establish Context
  */
 workflow.addNode("establishContext", async (state: ReviewState) => {
-  console.log(chalk.bold.blue(`\n🏃 Node: establishContext`));
-  
+  console.log(chalk.bold.blue(`
+🏃 Node: establishContext`));
+
   const details = await getPrDetailsViaCli(state.pr_url);
-  
+
   // Parse URL for context
   const urlMatch = state.pr_url.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
   const owner = urlMatch?.[1] || 'unknown';
   const repo = urlMatch?.[2] || 'unknown';
-  
+
   const context = {
     repo_name: `${owner}/${repo}`,
     source_branch: 'feature-branch', // TODO: Get from PR details
@@ -221,9 +221,9 @@ workflow.addNode("establishContext", async (state: ReviewState) => {
     deletions: 0, // Placeholder
     diff_summary: details.body || 'No description provided'
   };
-  
+
   console.log(chalk.green(`✅ Context established for ${context.repo_name}`));
-  
+
   return {
     pr_details: details,
     pr_context: context
@@ -234,28 +234,29 @@ workflow.addNode("establishContext", async (state: ReviewState) => {
  * Node 2: Filter Files & Fetch Full Diff
  */
 workflow.addNode("filterFiles", async (state: ReviewState) => {
-  console.log(chalk.bold.blue(`\n🏃 Node: filterFiles`));
-  
+  console.log(chalk.bold.blue(`
+🏃 Node: filterFiles`));
+
   // Fetch files and full diff in parallel for efficiency
   console.log(chalk.blue(`🔄 Fetching changed files and full PR diff...`));
-  
+
   const [allFiles, fullDiff] = await Promise.all([
     getChangedFilesViaCli(state.pr_url),
     getFullPrDiffViaCli(state.pr_url)
   ]);
-  
+
   if (!fullDiff) {
     throw new Error('Could not fetch PR diff');
   }
-  
+
   const filteredFiles = fileFilterService.filterFiles(allFiles);
-  
+
   // Update context with file count
   const updatedContext = {
     ...state.pr_context!,
     file_count: filteredFiles.length
   };
-  
+
   // Estimate complexity
   const complexity = fileFilterService.estimateComplexity(filteredFiles);
   console.log(chalk.blue(`📊 Analysis complexity estimation:`));
@@ -263,9 +264,9 @@ workflow.addNode("filterFiles", async (state: ReviewState) => {
   console.log(chalk.gray(`   Est. chunks: ${complexity.estimatedChunks}`));
   console.log(chalk.gray(`   Est. passes: ${complexity.estimatedPasses}`));
   console.log(chalk.gray(`   Est. time: ${complexity.estimatedTimeMinutes} minutes`));
-  
+
   console.log(chalk.green(`✅ Single API call completed - all file diffs cached locally`));
-  
+
   return {
     all_changed_files: allFiles,
     filtered_files: filteredFiles,
@@ -287,18 +288,19 @@ workflow.addNode("filterFiles", async (state: ReviewState) => {
  * Node 3: Setup File Chunks
  */
 workflow.addNode("setupFileChunks", async (state: ReviewState) => {
-  console.log(chalk.bold.blue(`\n🏃 Node: setupFileChunks`));
-  
+  console.log(chalk.bold.blue(`
+🏃 Node: setupFileChunks`));
+
   if (!state.files_to_process || state.files_to_process.length === 0) {
     console.log(chalk.yellow(`⚠️  No files to process`));
     return {};
   }
-  
+
   const currentFile = state.files_to_process[0];
   const remainingFiles = state.files_to_process.slice(1);
-  
+
   console.log(chalk.blue(`📁 Setting up chunks for: ${chalk.yellow(currentFile)}`));
-  
+
   // Extract file diff from already-fetched full diff (LOCAL operation, no API call!)
   const diff = extractFileFromFullDiff(state.full_pr_diff!, currentFile);
   if (!diff) {
@@ -310,10 +312,10 @@ workflow.addNode("setupFileChunks", async (state: ReviewState) => {
       chunks_to_process: []
     };
   }
-  
+
   // Create chunks
   const chunks = await chunkService.chunkFileDiff(currentFile, diff);
-  
+
   // Save chunks to database
   for (const chunk of chunks) {
     await prisma.chunkAnalysis.create({
@@ -331,9 +333,9 @@ workflow.addNode("setupFileChunks", async (state: ReviewState) => {
       }
     });
   }
-  
+
   console.log(chalk.green(`✅ Created ${chunks.length} chunks for ${currentFile}`));
-  
+
   return {
     current_file: currentFile,
     files_to_process: remainingFiles,
@@ -347,21 +349,22 @@ workflow.addNode("setupFileChunks", async (state: ReviewState) => {
  * Node 4: Analyze Chunk (4-pass analysis)
  */
 workflow.addNode("analyzeChunk", async (state: ReviewState) => {
-  console.log(chalk.bold.blue(`\n🏃 Node: analyzeChunk`));
-  
+  console.log(chalk.bold.blue(`
+🏃 Node: analyzeChunk`));
+
   if (!state.chunks_to_process || state.chunks_to_process.length === 0) {
     console.log(chalk.yellow(`⚠️  No chunks to process`));
     return {};
   }
-  
+
   const currentChunk = state.chunks_to_process[0];
   const remainingChunks = state.chunks_to_process.slice(1);
-  
+
   console.log(chalk.blue(`🔬 Analyzing chunk: ${chalk.yellow(currentChunk.id.slice(0, 8))}`));
-  
+
   // Perform 4-pass analysis
   const chunkAnalysis = await analysisService.analyzeChunk(currentChunk);
-  
+
   // Save analysis passes to database
   for (const [passType, analysis] of Object.entries(chunkAnalysis)) {
     if (analysis) {
@@ -380,16 +383,16 @@ workflow.addNode("analyzeChunk", async (state: ReviewState) => {
       });
     }
   }
-  
+
   console.log(chalk.green(`✅ 4-pass analysis completed for chunk ${currentChunk.id.slice(0, 8)}`));
-  
+
   // Update progress
   const newProgress = {
     ...state.progress!,
     completed_chunks: (state.progress?.completed_chunks || 0) + 1,
     completed_passes: (state.progress?.completed_passes || 0) + 4
   };
-  
+
   return {
     current_chunk: currentChunk,
     chunks_to_process: remainingChunks,
@@ -402,11 +405,12 @@ workflow.addNode("analyzeChunk", async (state: ReviewState) => {
  * Node 5: Synthesize File
  */
 workflow.addNode("synthesizeFile", async (state: ReviewState) => {
-  console.log(chalk.bold.blue(`\n🏃 Node: synthesizeFile`));
-  
+  console.log(chalk.bold.blue(`
+🏃 Node: synthesizeFile`));
+
   const currentFile = state.current_file!;
   const fileChunks = state.current_chunks || [];
-  
+
   // Collect all chunk analyses for this file
   const fileChunkAnalyses: { [chunkId: string]: any } = {};
   for (const chunk of fileChunks) {
@@ -414,20 +418,20 @@ workflow.addNode("synthesizeFile", async (state: ReviewState) => {
       fileChunkAnalyses[chunk.id] = state.chunk_analyses[chunk.id];
     }
   }
-  
+
   console.log(chalk.magenta(`📊 Synthesizing results for file: ${chalk.yellow(currentFile)}`));
-  
+
   // Generate file-level synthesis
   const fileResult = await analysisService.synthesizeFileAnalysis(currentFile, fileChunkAnalyses);
-  
+
   console.log(chalk.green(`✅ File synthesis completed for ${currentFile}`));
-  
+
   // Update progress
   const newProgress = {
     ...state.progress!,
     completed_files: (state.progress?.completed_files || 0) + 1
   };
-  
+
   return {
     file_results: { [currentFile]: fileResult },
     progress: newProgress
@@ -438,31 +442,36 @@ workflow.addNode("synthesizeFile", async (state: ReviewState) => {
  * Node 6: Final Synthesis
  */
 workflow.addNode("finalSynthesis", async (state: ReviewState) => {
-  console.log(chalk.bold.blue(`\n🏃 Node: finalSynthesis`));
-  
+  console.log(chalk.bold.blue(`🏃 Node: finalSynthesis`));
+
   // Collect all file results
   const fileResults = state.file_results || {};
   const fileCount = Object.keys(fileResults).length;
-  
+
   if (fileCount === 0) {
     console.log(chalk.yellow(`⚠️  No file results to synthesize`));
     return {
       final_report: "No files were analyzed due to filtering or errors."
     };
   }
-  
+
   // Prepare analysis summary
   let analysisText = '';
   let criticalIssues: string[] = [];
   let importantRecommendations: string[] = [];
   let minorSuggestions: string[] = [];
-  
+
   for (const [filePath, result] of Object.entries(fileResults)) {
-    analysisText += `\n## File: ${filePath}\n`;
-    analysisText += `Risk Level: ${result.overall_risk}\n`;
-    analysisText += `Total Issues: ${result.total_issues}\n`;
-    analysisText += `Analysis: ${result.file_synthesis}\n`;
-    
+    analysisText += `
+## File: ${filePath}
+`;
+    analysisText += `Risk Level: ${result.overall_risk}
+`;
+    analysisText += `Total Issues: ${result.total_issues}
+`;
+    analysisText += `Analysis: ${result.file_synthesis}
+`;
+
     // Categorize by risk level
     if (result.overall_risk === 'CRITICAL' || result.overall_risk === 'HIGH') {
       criticalIssues.push(`${filePath}: ${result.total_issues} issues (${result.overall_risk})`);
@@ -472,14 +481,14 @@ workflow.addNode("finalSynthesis", async (state: ReviewState) => {
       minorSuggestions.push(`${filePath}: Low risk, minor improvements possible`);
     }
   }
-  
+
   // Determine overall decision
   const hasCritical = criticalIssues.length > 0;
   const hasImportant = importantRecommendations.length > 0;
-  
+
   let decision: 'APPROVE' | 'REQUEST_CHANGES' | 'REJECT' = 'APPROVE';
   let reasoning = 'No significant issues found.';
-  
+
   if (hasCritical) {
     decision = criticalIssues.length > fileCount / 2 ? 'REJECT' : 'REQUEST_CHANGES';
     reasoning = `Found ${criticalIssues.length} files with critical/high risk issues.`;
@@ -487,7 +496,7 @@ workflow.addNode("finalSynthesis", async (state: ReviewState) => {
     decision = 'REQUEST_CHANGES';
     reasoning = `Found ${importantRecommendations.length} files that would benefit from improvements.`;
   }
-  
+
   const synthesisData = {
     critical_issues: criticalIssues,
     important_recommendations: importantRecommendations,
@@ -496,7 +505,7 @@ workflow.addNode("finalSynthesis", async (state: ReviewState) => {
     decision,
     reasoning
   };
-  
+
   // Generate final report using LLM
   const finalReportPrompt = PromptBuilder.buildSynthesisPrompt(
     state.pr_details?.title || 'No title',
@@ -505,9 +514,9 @@ workflow.addNode("finalSynthesis", async (state: ReviewState) => {
     Object.keys(state.chunk_analyses || {}).length,
     analysisText
   );
-  
+
   console.log(chalk.magenta(`🤖 Generating final report...`));
-  
+
   const finalReport = await analysisService['llmClient'].generate(finalReportPrompt, {
     onData: (chunk: string) => {
       process.stdout.write(chalk.magenta(chunk));
@@ -515,9 +524,12 @@ workflow.addNode("finalSynthesis", async (state: ReviewState) => {
     onComplete: () => {
       console.log(); // New line
       console.log(chalk.green(`✅ Final report synthesis completed`));
+    },
+    onError: (error: Error) => {
+      console.error(chalk.red(`❌ Streaming error:`), error.message);
     }
   });
-  
+
   return {
     synthesis_data: synthesisData,
     final_report: finalReport
@@ -568,8 +580,8 @@ export const app = workflow.compile({
 
 export const getAppWithConfig = (customConfig?: Partial<AnalysisConfig>) => {
   const config = { ...DEFAULT_CONFIG, ...customConfig };
-  initializeServices(config);
-  
+  initializeServices(config as AnalysisConfig);
+
   return {
     app,
     config: {

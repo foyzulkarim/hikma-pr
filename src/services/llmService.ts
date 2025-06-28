@@ -21,7 +21,7 @@ const SELECTED_MODEL = MODEL3;
 interface LLMConfig {
   baseUrl: string;
   model: string;
-  provider: 'ollama' | 'openai' | 'lmstudio';
+  provider: string;
   apiKey?: string;
 }
 

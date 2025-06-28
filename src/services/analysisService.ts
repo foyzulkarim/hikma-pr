@@ -20,12 +20,12 @@ export class AnalysisService {
     this.config = config;
     // For now, use the same model for all passes as requested
     this.llmClient = new LLMClient({
-      baseUrl: config.models.syntax_logic.base_url || 'http://localhost:11434',
-      model: config.models.syntax_logic.name,
-      provider: config.models.syntax_logic.provider
+      baseUrl: config.modelInfo.providerUrl,
+      model: config.modelInfo.modelName,
+      provider: config.modelInfo.provider,
     });
     
-    console.log(chalk.blue(`🔬 Analysis service initialized with model: ${chalk.yellow(config.models.syntax_logic.name)}`));
+    console.log(chalk.blue(`🔬 Analysis service initialized with model: ${chalk.yellow(config.modelInfo.modelName)}`));
   }
 
   /**
@@ -286,7 +286,7 @@ export class AnalysisService {
   updateModel(modelName: string): void {
     console.log(chalk.blue(`🔄 Switching to model: ${chalk.yellow(modelName)}`));
     this.llmClient = new LLMClient({
-      ...this.config.models.syntax_logic,
+      ...this.config.modelInfo,
       model: modelName
     });
   }

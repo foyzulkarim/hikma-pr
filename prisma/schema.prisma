@@ -7,7 +7,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:/Users/foyzul/.hikmapr/reviews.db"
+  url      = env("DATABASE_URL")
 }
 
 model Review {

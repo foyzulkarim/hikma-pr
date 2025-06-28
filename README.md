@@ -39,18 +39,48 @@ Before you begin, ensure you have the following installed:
     npm install
     ```
 
-3.  **Set up the database:**
-    Hikma-PR uses Prisma for state management. This step is required for the `resume` feature and the GUI.
+3.  **Build the project:**
+    Since this is a TypeScript project, you need to compile it to JavaScript before running.
+    ```bash
+    npm run build
+    ```
+
+4.  **Set up the database:**
+    Hikma-PR uses Prisma for state management with an SQLite database automatically created in `~/.hikmapr/reviews.db`. This step is required for the `resume` feature and the GUI.
     ```bash
     npx prisma generate
     npx prisma db push
     ```
 
-4.  **Configure your environment:**
-    Copy the example environment file and update it with your local LLM server details if they differ from the defaults.
-    ```bash
-    cp .env.example .env
-    ```
+## Configuration
+
+## Command Options
+
+The `review` command uses named options for better usability and flexibility:
+
+- **`-u, --url <url>`**: The full GitHub Pull Request URL
+- **`-p, --provider <provider>`**: The LLM provider (`ollama`, `lmstudio`, or `vllm`)
+- **`-s, --server <server>`**: The URL where your LLM server is running
+- **`-m, --model <model>`**: The name of the model to use for analysis
+
+### Supported Providers
+
+- **LM Studio**: Use `lmstudio` as provider, typically runs on `http://localhost:1234`
+- **Ollama**: Use `ollama` as provider, typically runs on `http://localhost:11434`
+- **vLLM**: Use `vllm` as provider, configure your custom endpoint
+
+### Example Commands
+
+```bash
+# LM Studio example
+hikma-pr review --url "https://github.com/owner/repo/pull/123" --provider "lmstudio" --server "http://localhost:1234" --model "gemma3:1b"
+
+# Ollama example (using short flags)
+hikma-pr review -u "https://github.com/owner/repo/pull/123" -p "ollama" -s "http://localhost:11434" -m "llama3:8b"
+
+# vLLM example (mixed flags)
+hikma-pr review --url "https://github.com/owner/repo/pull/123" -p "vllm" --server "http://localhost:8000" -m "microsoft/DialoGPT-medium"
+```
 
 ## Usage
 
@@ -61,18 +91,36 @@ The primary interface for Hikma-PR is its command-line tool.
 This is the main command. It kicks off the comprehensive, multi-pass analysis of a pull request.
 
 ```bash
-hikma review <full_github_pr_url>
+# Basic usage with named options (all 4 options are required)
+npx hikma-pr review --url <pr_url> --provider <provider> --server <server_url> --model <model>
 
-# Example:
-hikma review https://github.com/owner/repo/pull/123
+# Example with long flags
+npx hikma-pr review --url "https://github.com/owner/repo/pull/123" --provider "lmstudio" --server "http://localhost:1234" --model "gemma3:1b"
+
+# Example with short flags
+npx hikma-pr review -u "https://github.com/owner/repo/pull/123" -p "ollama" -s "http://localhost:11434" -m "llama3:8b"
+
+# Mixed usage (options can be in any order)
+npx hikma-pr review -p "vllm" --url "https://github.com/owner/repo/pull/123" -m "microsoft/DialoGPT-medium" --server "http://localhost:8000"
 ```
+
+> **Note for Developers:** If you are running the application locally for development using `npm run dev`, you need to provide all options and include the double dash (`--`) to separate npm script options from the command arguments:
+> ```bash
+> npm run dev -- review --url "<pr_url>" --provider "<provider>" --server "<server_url>" --model "<model>"
+> # Example with long flags:
+> npm run dev -- review --url "https://github.com/owner/repo/pull/123" --provider "lmstudio" --server "http://localhost:1234" --model "gemma3:1b"
+> # Example with short flags:
+> npm run dev -- review -u "https://github.com/owner/repo/pull/123" -p "ollama" -s "http://localhost:11434" -m "llama3:8b"
+> ```
+> 
+> The double dash (`--`) is important as it tells npm to pass all arguments after it directly to the script being run.
 
 ### Resume an Interrupted Review
 
 If a review fails for any reason (e.g., network issue, LLM error), you can resume it using the `taskId` provided when the review started.
 
 ```bash
-hikma resume <task_id>
+hikma-pr resume <task_id>
 ```
 
 ### Manage Reports
@@ -81,7 +129,7 @@ Hikma-PR saves a detailed markdown report for every completed review in the `rep
 
 **List all saved reports:**
 ```bash
-hikma reports list
+hikma-pr reports list
 ```
 
 **View a specific report in the console:**

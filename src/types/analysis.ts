@@ -145,19 +145,24 @@ export interface ModelConfig {
 }
 
 export interface AnalysisConfig {
-  models: {
-    syntax_logic: ModelConfig;
-    security_performance: ModelConfig;
-    architecture_design: ModelConfig;
-    testing_docs: ModelConfig;
-    synthesis: ModelConfig;
-  };
+  // models: {
+  //   syntax_logic: ModelConfig;
+  //   security_performance: ModelConfig;
+  //   architecture_design: ModelConfig;
+  //   testing_docs: ModelConfig;
+  //   synthesis: ModelConfig;
+  // };
   project: ProjectConfig;
   chunking: {
     max_tokens: number;
     overlap_lines: number;
     min_chunk_size: number;
   };
+  modelInfo: {
+    provider: string;
+    providerUrl: string;
+    modelName: string;
+  }
 } 
 
 // Enhanced types for comprehensive analysis system
