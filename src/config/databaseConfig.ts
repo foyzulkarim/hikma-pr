@@ -62,6 +62,7 @@ export async function ensureDatabaseSetup(): Promise<void> {
       const errorMessage = setupError instanceof Error ? setupError.message : String(setupError);
       console.error('❌ Failed to set up database:', errorMessage);
       console.log('💡 Please try running: npx prisma generate && npx prisma migrate deploy');
+      console.log('💡 If the issue persists, try deleting ~/.hikmapr/reviews.db and running the init command again');
       throw setupError;
     }
   }
