@@ -1,7 +1,9 @@
 // Analysis Service - Coordinates multi-pass analysis with specialized prompts
 
 import { AnalysisPass, ChunkInfo, AnalysisConfig, FileAnalysisResult } from '../types/analysis';
+import { PluginFinding } from '../types/plugins';
 import { LLMClient } from './llmService';
+import { PluginService } from './pluginService';
 import { 
   PromptBuilder, 
   SYNTAX_LOGIC_TEMPLATE,
@@ -15,17 +17,19 @@ import { v4 as uuidv4 } from 'uuid';
 export class AnalysisService {
   private llmClient: LLMClient;
   private config: AnalysisConfig;
+  private pluginService?: PluginService; // Make it optional for now
 
-  constructor(config: AnalysisConfig) {
+  constructor(config: AnalysisConfig, pluginService?: PluginService) {
     this.config = config;
+    this.pluginService = pluginService;
     // For now, use the same model for all passes as requested
     this.llmClient = new LLMClient({
-      baseUrl: config.models.syntax_logic.base_url || 'http://localhost:11434',
-      model: config.models.syntax_logic.name,
-      provider: config.models.syntax_logic.provider
+      baseUrl: config.modelInfo.providerUrl,
+      model: config.modelInfo.modelName,
+      provider: config.modelInfo.provider,
     });
     
-    console.log(chalk.blue(`🔬 Analysis service initialized with model: ${chalk.yellow(config.models.syntax_logic.name)}`));
+    console.log(chalk.blue(`🔬 Analysis service initialized with model: ${chalk.yellow(config.modelInfo.modelName)}`));
   }
 
   /**
@@ -36,6 +40,7 @@ export class AnalysisService {
     security_performance?: AnalysisPass;
     architecture_design?: AnalysisPass;
     testing_docs?: AnalysisPass;
+    plugin_findings?: PluginFinding[];
   }> {
     console.log(chalk.blue(`\n🔬 Starting 4-pass analysis for chunk: ${chunk.id.slice(0, 8)}`));
     console.log(chalk.gray(`📁 File: ${chunk.file_path}`));
@@ -82,6 +87,23 @@ export class AnalysisService {
     }
     
     console.log(chalk.green(`✅ All 4 passes completed for chunk ${chunk.id.slice(0, 8)}`));
+
+    // Run plugins for onChunkAnalysis hook
+    if (this.pluginService) {
+      console.log(chalk.blue(`🔌 Running plugins for onChunkAnalysis hook...`));
+      const pluginFindings = await this.pluginService.runPlugins('onChunkAnalysis', {
+        filePath: chunk.file_path,
+        chunkContent: chunk.diff_content,
+        llmClient: this.llmClient, // Pass the LLMClient here
+      });
+      if (pluginFindings.length > 0) {
+        console.log(chalk.green(`✅ Plugins found ${pluginFindings.length} findings for chunk ${chunk.id.slice(0, 8)}`));
+        // You might want to store these findings in the results object or a separate channel
+        // For now, let's just log them and consider how to integrate them into the report later.
+        // For example, you could add a new property to the AnalysisPass or a new channel in the workflow state.
+        results.plugin_findings = pluginFindings;
+      }
+    }
     
     return results;
   }
@@ -286,7 +308,7 @@ export class AnalysisService {
   updateModel(modelName: string): void {
     console.log(chalk.blue(`🔄 Switching to model: ${chalk.yellow(modelName)}`));
     this.llmClient = new LLMClient({
-      ...this.config.models.syntax_logic,
+      ...this.config.modelInfo,
       model: modelName
     });
   }

@@ -3,6 +3,7 @@
 import { ChunkInfo, ProjectConfig } from '../types/analysis';
 import chalk from 'chalk';
 import { v4 as uuidv4 } from 'uuid';
+import { DEFAULT_CONFIG } from '../graph/workflow';
 
 interface ChunkingConfig {
   maxTokens: number;
@@ -14,12 +15,12 @@ interface ChunkingConfig {
 export class ChunkService {
   private config: ChunkingConfig;
 
-  constructor(projectConfig: ProjectConfig) {
+  constructor(projectConfig: Partial<ProjectConfig>) {
     this.config = {
-      maxTokens: projectConfig.max_chunk_tokens,
+      maxTokens: projectConfig.max_chunk_tokens || DEFAULT_CONFIG.project.max_chunk_tokens,
       overlapLines: 3,
       minChunkSize: 50, // Minimum lines per chunk
-      contextLines: projectConfig.context_lines
+      contextLines: projectConfig.context_lines || DEFAULT_CONFIG.project.context_lines
     };
     
     console.log(chalk.blue(`🧩 Chunk service configured:`));

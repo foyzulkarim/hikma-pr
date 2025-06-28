@@ -1,278 +1,158 @@
-# Hikmapr - AI-Powered Pull Request Review Agent
+# Hikma-PR: Your Local-First, AI-Powered Pull Request Review Agent
 
-A sophisticated CLI tool that provides intelligent, multi-pass analysis of GitHub Pull Requests using local LLMs.
+![License](https://img.shields.io/badge/license-MIT-blue.svg) ![TypeScript](https://img.shields.io/badge/typescript-%233178C6.svg?style=for-the-badge&logo=typescript&logoColor=white) ![Node.js](https://img.shields.io/badge/node.js-6DA55F?style=for-the-badge&logo=node.js&logoColor=white)
 
-## 🚀 Key Features
+Hikma-PR is a sophisticated, stateful CLI application designed to automate the review of GitHub Pull Requests. Its core mission is to leverage the power of locally hosted Large Language Models (LLMs) to provide in-depth, multi-faceted code analysis without relying on cloud-based services. This gives you unlimited, cost-free, and private code analysis.
 
-### **Single API Call Architecture**
-- **Efficient**: Fetches entire PR diff in one `gh` CLI call
-- **Rate Limit Friendly**: No multiple API calls per file
-- **Local Processing**: All file extraction done locally after single fetch
+The system is architected to be modular, extensible, and resilient. It uses a graph-based workflow engine to orchestrate a team of specialized AI agents, ensuring a deep and comprehensive review process that can be resumed at any time.
 
-### **Multi-Pass Analysis**
-- **4 Specialized Passes**: Syntax/Logic, Security/Performance, Architecture/Design, Testing/Docs
-- **Intelligent Chunking**: Recursive splitting with context preservation
-- **Smart Filtering**: Auto-detects project type and filters relevant files
-- **Hierarchical Synthesis**: Chunk → File → PR level analysis
+## Key Features
 
-### **Complete Tracking**
-- **Database Storage**: Every analysis pass saved with metadata
-- **Progress Monitoring**: Real-time progress with streaming responses
-- **Resume Capability**: Can resume interrupted analyses
-- **Report Generation**: Markdown reports with file-level details
+-   **Local LLM Integration**: Works out-of-the-box with local LLM servers like **LM Studio**, **Ollama**, and any OpenAI-compatible endpoint. Keep your code on your machine.
+-   **Stateful & Resumable Reviews**: Never lose progress. If a review is interrupted, you can resume it from the exact point it left off with the `resume` command.
+-   **Multi-Agent Analysis**: Goes beyond simple reviews by using a team of specialized AI agents for different analysis aspects: Architecture, Security, Performance, and Testing.
+-   **Dynamic, Context-Aware Prompts**: Generates highly specific prompts by analyzing the repository's language, framework, and architectural patterns, leading to more relevant and accurate insights.
+-   **Comprehensive Reporting**: Generates detailed markdown reports for each review, which are stored locally for your records.
+-   **Optional GUI**: Includes a Next.js-based web interface to visualize review results in a user-friendly format.
 
-### **Modern Web Dashboard**
-- **Real-time Progress**: Visual progress bars and completion tracking
-- **Risk Assessment**: Color-coded risk levels (LOW/MEDIUM/HIGH/CRITICAL)
-- **Interactive Analysis**: Expandable chunks with detailed pass results
-- **Decision Support**: Clear APPROVE/REQUEST_CHANGES/REJECT recommendations
+## Getting Started
 
-## 🛠️ Prerequisites
+### Prerequisites
 
-Before you start, ensure you have these installed:
+Before you begin, ensure you have the following installed:
 
-### **Required Software**
-1. **Node.js 18+** - [Download here](https://nodejs.org/)
-2. **GitHub CLI (gh)** - [Installation guide](https://cli.github.com/)
-3. **Ollama** - [Download here](https://ollama.ai/) (for local LLM)
+-   [Node.js](https://nodejs.org/) (v18 or higher)
+-   [npm](https://www.npmjs.com/)
+-   [GitHub CLI (`gh`)](https://cli.github.com/): Make sure you are authenticated (`gh auth login`).
+-   A local LLM server: We recommend [LM Studio](https://lmstudio.ai/) or [Ollama](https://ollama.ai/).
 
+### Installation
 
-### Video demo
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-username/hikma-pr.git
+    cd hikma-pr
+    ```
 
-[![My Awesome Video](https://img.youtube.com/vi/5dSYV0jQpTU/hqdefault.jpg)](https://youtu.be/5dSYV0jQpTU)
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
 
-### **Setup Steps**
+3.  **Build the project:**
+    Since this is a TypeScript project, you need to compile it to JavaScript before running.
+    ```bash
+    npm run build
+    ```
 
-#### 1. Install and Configure GitHub CLI
-```bash
-# Install GitHub CLI (if not already installed)
-# macOS
-brew install gh
-# Windows
-winget install GitHub.cli
-# Linux
-sudo apt install gh
+4.  **Set up the database:**
+    Hikma-PR uses Prisma for state management with an SQLite database automatically created in `~/.hikmapr/reviews.db`. This step is required for the `resume` feature and the GUI.
+    ```bash
+    npx prisma generate
+    npx prisma db push
+    ```
 
-# Authenticate with GitHub
-gh auth login
-```
+## Configuration
 
-#### 2. Install and Start Ollama
-```bash
-# Download and install Ollama from https://ollama.ai/
-# Then pull the required model
-ollama pull gemma2:2b
-# or for faster analysis (smaller model)
-ollama pull gemma2:1b
-```
+## Command Options
 
-#### 3. Verify Prerequisites
-```bash
-# Check Node.js version (should be 18+)
-node --version
+The `review` command uses named options for better usability and flexibility:
 
-# Check GitHub CLI is authenticated
-gh auth status
+- **`-u, --url <url>`**: The full GitHub Pull Request URL
+- **`-p, --provider <provider>`**: The LLM provider (`ollama`, `lmstudio`, or `vllm`)
+- **`-s, --server <server>`**: The URL where your LLM server is running
+- **`-m, --model <model>`**: The name of the model to use for analysis
 
-# Check Ollama is running
-ollama list
-```
+### Supported Providers
 
-## 🔧 Configuration
+- **LM Studio**: Use `lmstudio` as provider, typically runs on `http://localhost:1234`
+- **Ollama**: Use `ollama` as provider, typically runs on `http://localhost:11434`
+- **vLLM**: Use `vllm` as provider, configure your custom endpoint
 
-### **LLM Models**
-Configure in `src/graph/workflow.ts`:
-
-```typescript
-const DEFAULT_CONFIG: AnalysisConfig = {
-  models: {
-    syntax_logic: { name: 'gemma2:2b', provider: 'ollama' },
-    security_performance: { name: 'gemma2:2b', provider: 'ollama' },
-    architecture_design: { name: 'gemma2:2b', provider: 'ollama' },
-    testing_docs: { name: 'gemma2:2b', provider: 'ollama' }
-  }
-}
-```
-
-### **Project Detection**
-Automatically detects and filters files for:
-- **JavaScript/TypeScript**: React, Next.js, Node.js, Vue, Angular
-- **Python**: Django, Flask, FastAPI, general Python
-- **Java**: Spring Boot, Maven, Gradle projects
-- **Go**: Go modules and packages
-- **C#**: .NET, ASP.NET projects
-- **PHP**: Laravel, Symfony projects
-
-## 📋 Installation & Quick Start
-
-### **Step 1: Clone and Install**
-```bash
-# Clone the repository
-git clone https://github.com/foyzulkarim/hikma-pr.git
-cd hikma-pr
-
-# Install dependencies
-npm install
-
-# Set up database
-npm run db:migrate
-```
-
-### **Step 2: First Analysis**
-```bash
-# Analyze any public GitHub PR
-npm run dev -- review https://github.com/foyzulkarim/hikma/pull/1
-
-# Or build and run
-npm run build
-npm start review https://github.com/foyzulkarim/hikma/pull/1
-```
-
-### **Step 3: Launch Web Dashboard (Optional)**
-```bash
-# In a new terminal window
-cd hikma-pr-gui
-npm install
-
-# Set up database (sync schema and generate Prisma client)
-npm run db:generate
-
-# Start the development server
-npm run dev
-
-# Visit http://localhost:3000 to see the dashboard
-```
-
-> **Note:** If you encounter database errors, see [hikma-pr-gui/DATABASE.md](./hikma-pr-gui/DATABASE.md) for detailed setup instructions.
-
-
-## 📊 Example Output
+### Example Commands
 
 ```bash
-🚀 Starting Hikmapr Multi-Pass Analysis
-📝 Task ID: abc123def
-🔗 PR URL: https://github.com/owner/repo/pull/123
-🔬 Using Advanced Multi-Pass Analysis Architecture
+# LM Studio example
+hikma-pr review --url "https://github.com/owner/repo/pull/123" --provider "lmstudio" --server "http://localhost:1234" --model "gemma3:1b"
 
-✅ Single API call completed - all file diffs cached locally
-📊 Found 5 analyzable files (filtered from 12 total files)
-🔄 Processing chunks: ████████████████████ 100% (20/20)
+# Ollama example (using short flags)
+hikma-pr review -u "https://github.com/owner/repo/pull/123" -p "ollama" -s "http://localhost:11434" -m "llama3:8b"
 
-🔬 Analysis Progress:
-├── 📄 src/components/Button.tsx
-│   ├── 🔍 Syntax & Logic: ✅ LOW risk (2.1s)
-│   ├── 🔒 Security & Performance: ✅ LOW risk (1.8s)
-│   ├── 🏗️ Architecture & Design: ⚠️ MEDIUM risk (2.3s)
-│   └── 📋 Testing & Documentation: ❌ HIGH risk (1.9s)
-├── 📄 src/utils/api.ts
-│   ├── 🔍 Syntax & Logic: ✅ LOW risk (1.5s)
-│   ├── 🔒 Security & Performance: 🚨 CRITICAL risk (2.7s)
-│   └── ... (analysis continues)
-
-📊 Final Summary:
-├── 🟢 LOW: 12 issues
-├── 🟡 MEDIUM: 5 issues  
-├── 🟠 HIGH: 3 issues
-└── 🔴 CRITICAL: 1 issue
-
-🎯 Recommendation: REQUEST_CHANGES
-📄 Report saved: reports/owner-repo-PR123-2024-01-15-abc123def.md
-🌐 View in dashboard: http://localhost:3000/review/abc123def
+# vLLM example (mixed flags)
+hikma-pr review --url "https://github.com/owner/repo/pull/123" -p "vllm" --server "http://localhost:8000" -m "microsoft/DialoGPT-medium"
 ```
 
-## 🛠️ Development Scripts
+## Usage
 
-Quick reference for development tasks:
+The primary interface for Hikma-PR is its command-line tool.
+
+### Start a New Review
+
+This is the main command. It kicks off the comprehensive, multi-pass analysis of a pull request.
 
 ```bash
-# Show all available scripts with descriptions
-npm run help
+# Basic usage with named options (all 4 options are required)
+npx hikma-pr review --url <pr_url> --provider <provider> --server <server_url> --model <model>
 
-# Development workflow
-npm run dev          # Run in development mode (hot reload)
-npm run build        # Build TypeScript to JavaScript
-npm start           # Run the built application
+# Example with long flags
+npx hikma-pr review --url "https://github.com/owner/repo/pull/123" --provider "lmstudio" --server "http://localhost:1234" --model "gemma3:1b"
 
-# Database management
-npm run db:generate  # Generate Prisma client after schema changes
-npm run db:migrate   # Create and apply new migration
-npm run db:deploy    # Apply existing migrations (production)
-npm run db:studio    # Open database GUI
-npm run db:status    # Check migration status
+# Example with short flags
+npx hikma-pr review -u "https://github.com/owner/repo/pull/123" -p "ollama" -s "http://localhost:11434" -m "llama3:8b"
+
+# Mixed usage (options can be in any order)
+npx hikma-pr review -p "vllm" --url "https://github.com/owner/repo/pull/123" -m "microsoft/DialoGPT-medium" --server "http://localhost:8000"
 ```
 
-For detailed explanations of each script, see [SCRIPTS.md](./SCRIPTS.md) or run `npm run help`.
+> **Note for Developers:** If you are running the application locally for development using `npm run dev`, you need to provide all options and include the double dash (`--`) to separate npm script options from the command arguments:
+> ```bash
+> npm run dev -- review --url "<pr_url>" --provider "<provider>" --server "<server_url>" --model "<model>"
+> # Example with long flags:
+> npm run dev -- review --url "https://github.com/owner/repo/pull/123" --provider "lmstudio" --server "http://localhost:1234" --model "gemma3:1b"
+> # Example with short flags:
+> npm run dev -- review -u "https://github.com/owner/repo/pull/123" -p "ollama" -s "http://localhost:11434" -m "llama3:8b"
+> ```
+> 
+> The double dash (`--`) is important as it tells npm to pass all arguments after it directly to the script being run.
 
-## 🗃️ Database Schema
+### Resume an Interrupted Review
 
-Tracks comprehensive analysis data:
-- **Reviews**: PR metadata and final reports
-- **ChunkAnalysis**: Individual chunks with context
-- **AnalysisPass**: All 4 passes per chunk with risk levels
-- **FileAnalysis**: Legacy file-level analyses
+If a review fails for any reason (e.g., network issue, LLM error), you can resume it using the `taskId` provided when the review started.
 
-
-## 🚨 Troubleshooting
-
-### **Common Issues**
-
-#### "gh: command not found"
 ```bash
-# Install GitHub CLI
-brew install gh  # macOS
-# or visit https://cli.github.com/
+hikma-pr resume <task_id>
 ```
 
-#### "ollama: command not found"
+### Manage Reports
+
+Hikma-PR saves a detailed markdown report for every completed review in the `reports/` directory.
+
+**List all saved reports:**
 ```bash
-# Install Ollama from https://ollama.ai/
-# Then pull a model
-ollama pull gemma2:2b
+hikma-pr reports list
 ```
 
-#### "Database connection error"
+**View a specific report in the console:**
 ```bash
-# Reset database
-npm run db:reset
-npm run db:migrate
+# View by number from the list
+hikma-pr reports view 1
+
+# Or view by filename/taskId
+hikma-pr reports view <report_filename_or_task_id>
 ```
 
-#### "Build errors after updates"
-```bash
-# Clean and rebuild
-npm run db:generate
-npm run build
-```
+## Project Documentation
 
-### **Getting Help**
-- 📖 Read [SCRIPTS.md](./SCRIPTS.md) for detailed script explanations
-- 🗄️ Read [hikma-pr-gui/DATABASE.md](./hikma-pr-gui/DATABASE.md) for GUI database issues
-- 🐛 [Open an issue](https://github.com/foyzulkarim/hikma-pr/issues) for bugs
-- 💬 [Start a discussion](https://github.com/foyzulkarim/hikma-pr/discussions) for questions
+For a deeper understanding of the project's inner workings, please refer to the detailed documentation:
 
-## 🎯 Why This Architecture?
+-   **[Software Architecture Document](./docs/ARCHITECTURE.md)**: A high-level overview of the system's components, layers, and the comprehensive review workflow.
+-   **[Data Flow Document](./docs/DATA_FLOW.md)**: A detailed explanation of how data moves through the system, from the initial user command to the final report generation.
+-   **[Plugin Architecture Document](./docs/PLUGIN_ARCHITECTURE.md)**: Describes the extensible plugin system, allowing custom analysis logic to be added without modifying core code.
 
-1. **Rate Limit Safe**: Single API call vs. N calls per file
-2. **Efficient**: Local processing after single fetch
-3. **Resilient**: Database checkpointing and resume capability
-4. **Comprehensive**: 4-pass analysis with risk assessment
-5. **User Friendly**: No API keys, uses `gh` CLI authentication
+## Contributing
 
-Perfect for teams wanting thorough PR analysis without API rate limiting concerns.
+Contributions are welcome! Please feel free to submit a pull request or open an issue to discuss your ideas. For major changes, please open an issue first to discuss what you would like to change.
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes and test thoroughly
-4. Commit your changes: `git commit -m 'Add amazing feature'`
-5. Push to the branch: `git push origin feature/amazing-feature`
-6. Open a Pull Request
-
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-⭐ **Star this repo if you find it helpful!** ⭐

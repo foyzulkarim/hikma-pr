@@ -114,6 +114,7 @@
     "examples/**/*",
     "node_modules/**/*",
     "dist/**/*",
-    "hikma-pr-gui/**/*"
+    "hikma-pr-gui/**/*",
+    "tests/**/*"
   ]
 }

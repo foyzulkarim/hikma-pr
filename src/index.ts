@@ -8,10 +8,21 @@
  */
 
 import { Command } from 'commander';
+import { addConfigOptions } from './config/configLoader';
 import { reviewCommandHandler } from './commands/review';
 import { resumeCommandHandler } from './commands/resume';
 import { listReportsHandler, viewReportHandler, viewFileAnalysesHandler, cleanReportsHandler } from './commands/reports';
+import { setupDatabaseConfig } from './config/databaseConfig';
 import { PrismaClient } from '@prisma/client';
+import { PluginService } from './services/pluginService';
+import * as path from 'path';
+
+// Setup database configuration before initializing Prisma
+setupDatabaseConfig();
+
+// Initialize and load plugins
+const pluginService = new PluginService(path.join(__dirname, 'plugins'));
+pluginService.loadPlugins();
 
 // Configuration for GitHub interaction method
 export type GitHubMethod = 'sdk' | 'cli';
@@ -34,13 +45,21 @@ program
   .description('A stateful, resilient, and powerful CLI agent for reviewing Pull Requests.')
   .version('0.1.0');
 
-program
+const reviewCommand = program
   .command('review')
   .description('Start a new multi-pass PR review analysis.')
-  .argument('<url>', 'The full URL of the GitHub Pull Request to review.')
-  .action(async (url) => {
+  .requiredOption('-u, --url <url>', 'The full URL of the GitHub Pull Request to review.')
+  .requiredOption('-p, --provider <provider>', 'The provider of the LLM model. (ollama, lmstudio, vllm)')
+  .requiredOption('-s, --server <server>', 'The URL of the LLM server.')
+  .requiredOption('-m, --model <model>', 'The name of the LLM model to use.');
+
+// Add common configuration options
+addConfigOptions(reviewCommand)
+  .action(async (options: { url: string; provider: string; server: string; model: string }) => {
     try {
-      await reviewCommandHandler(url, prisma, GITHUB_METHOD);
+      const { url, provider, server, model } = options;
+      const input = { url, prisma, provider, llmUrl: server, llmModel: model, pluginService };
+      await reviewCommandHandler(input);
     } catch (error) {
       console.error('Error during review process:', error);
       process.exit(1);

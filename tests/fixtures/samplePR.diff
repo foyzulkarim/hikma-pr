@@ -1,0 +1,87 @@
+diff --git a/src/components/UserProfile.tsx b/src/components/UserProfile.tsx
+index 1234567..abcdefg 100644
+--- a/src/components/UserProfile.tsx
++++ b/src/components/UserProfile.tsx
+@@ -1,10 +1,15 @@
+ import React, { useState, useEffect } from 'react';
++import { validateEmail } from '../utils/validation';
+ 
+ interface UserProfileProps {
+   userId: string;
++  onUpdate?: (user: User) => void;
+ }
+ 
++interface User {
++  id: string;
++  email: string;
++  name: string;
++}
++
+ export const UserProfile: React.FC<UserProfileProps> = ({ userId }) => {
+   const [user, setUser] = useState(null);
++  const [loading, setLoading] = useState(false);
+ 
+   useEffect(() => {
++    setLoading(true);
+     fetchUser(userId).then(setUser);
++    setLoading(false);
+   }, [userId]);
+ 
++  const handleEmailUpdate = async (newEmail: string) => {
++    if (!validateEmail(newEmail)) {
++      throw new Error('Invalid email format');
++    }
++    
++    const updatedUser = await updateUserEmail(userId, newEmail);
++    setUser(updatedUser);
++    onUpdate?.(updatedUser);
++  };
++
+   return (
+     <div className="user-profile">
+-      <h2>User Profile</h2>
++      <h2>User Profile {loading && '(Loading...)'}</h2>
+       {user && (
+         <div>
+           <p>Name: {user.name}</p>
+           <p>Email: {user.email}</p>
++          <button onClick={() => handleEmailUpdate('new@email.com')}>
++            Update Email
++          </button>
+         </div>
+       )}
+     </div>
+diff --git a/src/utils/validation.ts b/src/utils/validation.ts
+new file mode 100644
+index 0000000..1234567
+--- /dev/null
++++ b/src/utils/validation.ts
+@@ -0,0 +1,12 @@
++/**
++ * Validation utilities
++ */
++
++export const validateEmail = (email: string): boolean => {
++  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
++  return emailRegex.test(email);
++};
++
++export const validateRequired = (value: any): boolean => {
++  return value !== null && value !== undefined && value !== '';
++};
+diff --git a/src/api/userService.ts b/src/api/userService.ts
+index 1234567..abcdefg 100644
+--- a/src/api/userService.ts
++++ b/src/api/userService.ts
+@@ -5,6 +5,10 @@ export const fetchUser = async (userId: string) => {
+   return response.json();
+ };
+ 
++export const updateUserEmail = async (userId: string, email: string) => {
++  const response = await fetch(`/api/users/${userId}`, {
++    method: 'PATCH',
++    headers: { 'Content-Type': 'application/json' },
++    body: JSON.stringify({ email })
++  });
++  return response.json();
++};

@@ -1,0 +1,1247 @@
+import { execSync, exec } from 'child_process';
+import { promisify } from 'util';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { 
+  CompleteRepositoryContext, 
+  BlastRadius, 
+  ContextualCodeMap, 
+  ContextualCode,
+  CodebaseMap,
+  ArchitecturalPattern,
+  HistoricalPattern,
+  DependencyGraph,
+  QualityMetrics,
+  GitCommit,
+  DirectoryStructure
+} from '../types/analysis.js';
+import { ENHANCED_SYSTEM_CONFIG } from '../config/enhancedConfig.js';
+
+const execAsync = promisify(exec);
+
+export class RepositoryIntelligenceService {
+  private gitService: GitService;
+  private astService: ASTService;
+  private dependencyService: DependencyService;
+
+  constructor() {
+    this.gitService = new GitService();
+    this.astService = new ASTService();
+    this.dependencyService = new DependencyService();
+  }
+
+  async acquireCompleteContext(repoUrl: string, prNumber: number): Promise<CompleteRepositoryContext> {
+    console.log(`🔍 Acquiring complete repository context for PR #${prNumber}`);
+    
+    // Clone repository with full history
+    const repoPath = await this.cloneRepository(repoUrl);
+    
+    // Get changed files for the PR
+    const changedFiles = await this.getChangedFiles(repoPath, prNumber);
+    
+    // Build comprehensive understanding in parallel
+    const [
+      codebaseMap,
+      architecturalPatterns,
+      historicalPatterns,
+      dependencyGraph,
+      qualityMetrics
+    ] = await Promise.all([
+      this.buildCodebaseMap(repoPath),
+      this.extractArchitecturalPatterns(repoPath),
+      this.analyzeHistoricalPatterns(repoPath),
+      this.buildDependencyGraph(repoPath),
+      this.extractQualityMetrics(repoPath)
+    ]);
+    
+    return {
+      repoPath,
+      repoUrl,
+      prNumber,
+      changedFiles,
+      codebaseMap,
+      architecturalPatterns,
+      historicalPatterns,
+      dependencyGraph,
+      qualityMetrics
+    };
+  }
+
+  async buildBlastRadius(changedFiles: string[], repoPath: string): Promise<BlastRadius> {
+    console.log(`💥 Building blast radius for ${changedFiles.length} changed files`);
+    
+    // Combine AST analysis with dependency tracking
+    const [astImpact, depImpact] = await Promise.all([
+      this.astService.findRelatedCode(changedFiles, repoPath),
+      this.dependencyService.analyzePRDependencies(changedFiles, repoPath)
+    ]);
+    
+    return {
+      directImpact: astImpact.directDependencies,
+      indirectImpact: astImpact.transitiveDependencies,
+      testImpact: astImpact.affectedTests,
+      documentationImpact: depImpact.documentationFiles,
+      migrationImpact: depImpact.migrationFiles,
+      configurationImpact: depImpact.configFiles
+    };
+  }
+
+  async extractContextualCode(
+    targetFiles: string[],
+    blastRadius: BlastRadius,
+    repoPath: string
+  ): Promise<ContextualCodeMap> {
+    console.log(`📋 Extracting contextual code for ${targetFiles.length} files`);
+    
+    const contextMap = new Map<string, ContextualCode>();
+    
+    // Process files in parallel batches to avoid overwhelming the system
+    const batchSize = 5;
+    for (let i = 0; i < targetFiles.length; i += batchSize) {
+      const batch = targetFiles.slice(i, i + batchSize);
+      
+      await Promise.all(batch.map(async (file) => {
+        try {
+          const contextualCode = await this.buildContextualCode(file, blastRadius, repoPath);
+          contextMap.set(file, contextualCode);
+        } catch (error) {
+          console.warn(`⚠️ Failed to extract context for ${file}:`, error);
+          // Set minimal context to avoid breaking the analysis
+          contextMap.set(file, await this.getMinimalContext(file, repoPath));
+        }
+      }));
+    }
+    
+    return contextMap;
+  }
+
+  private async cloneRepository(repoUrl: string): Promise<string> {
+    const repoName = this.extractRepoName(repoUrl);
+    const clonePath = path.join(ENHANCED_SYSTEM_CONFIG.repository.cloneDirectory, repoName);
+    
+    try {
+      // Check if repository already exists
+      await fs.access(clonePath);
+      console.log(`📁 Repository already exists at ${clonePath}, updating...`);
+      
+      // Update existing repository
+      await execAsync('git fetch --all', { cwd: clonePath });
+      await execAsync('git pull', { cwd: clonePath });
+    } catch {
+      console.log(`📥 Cloning repository to ${clonePath}...`);
+      
+      // Ensure directory exists
+      await fs.mkdir(path.dirname(clonePath), { recursive: true });
+      
+      // Clone with full history if enabled
+      const cloneCommand = ENHANCED_SYSTEM_CONFIG.repository.enableFullClone
+        ? `git clone ${repoUrl} ${clonePath}`
+        : `git clone --depth 50 ${repoUrl} ${clonePath}`;
+      
+      await execAsync(cloneCommand);
+    }
+    
+    return clonePath;
+  }
+
+  private async getChangedFiles(repoPath: string, prNumber: number): Promise<string[]> {
+    try {
+      // Get the PR's changed files using git diff
+      const { stdout } = await execAsync(
+        `git diff --name-only HEAD~1 HEAD`,
+        { cwd: repoPath }
+      );
+      
+      return stdout.trim().split('\n').filter(file => file.length > 0);
+    } catch (error) {
+      console.warn('⚠️ Could not get changed files from git, using fallback method');
+      return [];
+    }
+  }
+
+  private async buildCodebaseMap(repoPath: string): Promise<CodebaseMap> {
+    console.log('🗺️ Building codebase map...');
+    
+    const structure = await this.buildDirectoryStructure(repoPath);
+    const fileTypes = await this.analyzeFileTypes(repoPath);
+    const totalLines = await this.countTotalLines(repoPath);
+    const languages = await this.detectLanguages(repoPath);
+    
+    return {
+      structure,
+      fileTypes,
+      totalLines,
+      languages
+    };
+  }
+
+  private async extractArchitecturalPatterns(repoPath: string): Promise<ArchitecturalPattern[]> {
+    console.log('🏗️ Extracting architectural patterns...');
+    
+    const patterns: ArchitecturalPattern[] = [];
+    
+    // Detect common patterns
+    const patternDetectors = [
+      this.detectMVCPattern.bind(this),
+      this.detectRepositoryPattern.bind(this),
+      this.detectFactoryPattern.bind(this),
+      this.detectObserverPattern.bind(this),
+      this.detectSingletonPattern.bind(this)
+    ];
+    
+    for (const detector of patternDetectors) {
+      try {
+        const pattern = await detector(repoPath);
+        if (pattern) {
+          patterns.push(pattern);
+        }
+      } catch (error) {
+        console.warn('⚠️ Pattern detection failed:', error);
+      }
+    }
+    
+    return patterns;
+  }
+
+  private async analyzeHistoricalPatterns(repoPath: string): Promise<HistoricalPattern[]> {
+    if (!ENHANCED_SYSTEM_CONFIG.repository.enableHistoricalAnalysis) {
+      return [];
+    }
+    
+    console.log('📊 Analyzing historical patterns...');
+    
+    try {
+      const commits = await this.getRecentCommits(repoPath);
+      const patterns = await this.extractPatternsFromCommits(commits);
+      
+      return patterns;
+    } catch (error) {
+      console.warn('⚠️ Historical analysis failed:', error);
+      return [];
+    }
+  }
+
+  private async buildDependencyGraph(repoPath: string): Promise<DependencyGraph> {
+    console.log('🕸️ Building dependency graph...');
+    
+    return this.dependencyService.buildDependencyGraph(repoPath);
+  }
+
+  private async extractQualityMetrics(repoPath: string): Promise<QualityMetrics> {
+    console.log('📈 Extracting quality metrics...');
+    
+    // This would integrate with tools like SonarQube, ESLint, etc.
+    // For now, we'll provide basic metrics
+    return {
+      codeComplexity: await this.calculateComplexity(repoPath),
+      testCoverage: await this.calculateTestCoverage(repoPath),
+      duplication: await this.calculateDuplication(repoPath),
+      maintainabilityIndex: await this.calculateMaintainabilityIndex(repoPath)
+    };
+  }
+
+  private async buildContextualCode(
+    file: string,
+    blastRadius: BlastRadius,
+    repoPath: string
+  ): Promise<ContextualCode> {
+    const [
+      completeFileContent,
+      relatedFunctions,
+      dependencyChain,
+      usageExamples,
+      testCoverage,
+      historicalContext
+    ] = await Promise.all([
+      this.getCompleteFile(file, repoPath),
+      this.getRelatedFunctions(file, blastRadius, repoPath),
+      this.getDependencyChain(file, repoPath),
+      this.getUsageExamples(file, repoPath),
+      this.getTestCoverage(file, repoPath),
+      this.getHistoricalContext(file, repoPath)
+    ]);
+    
+    return {
+      completeFileContent,
+      relatedFunctions,
+      dependencyChain,
+      usageExamples,
+      testCoverage,
+      historicalContext
+    };
+  }
+
+  private async getMinimalContext(file: string, repoPath: string): Promise<ContextualCode> {
+    const completeFileContent = await this.getCompleteFile(file, repoPath);
+    
+    return {
+      completeFileContent,
+      relatedFunctions: [],
+      dependencyChain: { imports: [], exports: [], transitiveDependencies: [] },
+      usageExamples: [],
+      testCoverage: { covered: false, testFiles: [], coveragePercentage: 0 },
+      historicalContext: { recentChanges: [], changeFrequency: 0, bugHistory: [] }
+    };
+  }
+
+  private extractRepoName(repoUrl: string): string {
+    const match = repoUrl.match(/\/([^\/]+)\.git$/) || repoUrl.match(/\/([^\/]+)$/);
+    return match ? match[1] : 'unknown-repo';
+  }
+
+  // Complete implementations based on FINAL_IMPROVEMENT_PLAN.md
+  private async buildDirectoryStructure(repoPath: string): Promise<DirectoryStructure> {
+    console.log('📁 Building directory structure...');
+    
+    const structure: DirectoryStructure = {
+      totalDirectories: 0,
+      totalFiles: 0,
+      maxDepth: 0,
+      structure: {},
+      patterns: []
+    };
+    
+    const buildStructureRecursive = async (currentPath: string, depth: number = 0): Promise<any> => {
+      try {
+        const items = await fs.readdir(currentPath, { withFileTypes: true });
+        const currentStructure: any = {};
+        
+        structure.maxDepth = Math.max(structure.maxDepth, depth);
+        
+        for (const item of items) {
+          const fullPath = path.join(currentPath, item.name);
+          
+          // Skip common ignore patterns
+          if (this.shouldIgnoreItem(item.name)) continue;
+          
+          if (item.isDirectory()) {
+            structure.totalDirectories++;
+            currentStructure[item.name] = await buildStructureRecursive(fullPath, depth + 1);
+          } else {
+            structure.totalFiles++;
+            const stats = await fs.stat(fullPath);
+            currentStructure[item.name] = {
+              type: 'file',
+              extension: path.extname(item.name),
+              size: stats.size,
+              modified: stats.mtime
+            };
+          }
+        }
+        
+        return currentStructure;
+      } catch (error) {
+        console.warn(`⚠️ Could not read directory ${currentPath}:`, error);
+        return {};
+      }
+    };
+    
+    structure.structure = await buildStructureRecursive(repoPath);
+    structure.patterns = this.detectDirectoryPatterns(structure.structure);
+    
+    console.log(`✅ Directory structure built: ${structure.totalFiles} files, ${structure.totalDirectories} directories`);
+    return structure;
+  }
+
+  private shouldIgnoreItem(name: string): boolean {
+    const ignorePatterns = [
+      'node_modules', '.git', '.DS_Store', 'dist', 'build', 
+      'coverage', '.nyc_output', 'logs', '.env', '.vscode',
+      'target', 'bin', 'obj', '.idea', '*.log'
+    ];
+    
+    return ignorePatterns.some(pattern => {
+      if (pattern.includes('*')) {
+        const regex = new RegExp(pattern.replace('*', '.*'));
+        return regex.test(name);
+      }
+      return name === pattern;
+    });
+  }
+
+  private detectDirectoryPatterns(structure: any): string[] {
+    const patterns: string[] = [];
+    const directories = Object.keys(structure).filter(key => 
+      typeof structure[key] === 'object' && structure[key].type !== 'file'
+    );
+    
+    // Common architectural patterns
+    if (directories.includes('src') && directories.includes('test')) {
+      patterns.push('Standard Source/Test Structure');
+    }
+    
+    if (directories.includes('controllers') || directories.includes('models') || directories.includes('views')) {
+      patterns.push('MVC Architecture');
+    }
+    
+    if (directories.includes('services') && directories.includes('repositories')) {
+      patterns.push('Service-Repository Pattern');
+    }
+    
+    if (directories.includes('components') && directories.includes('pages')) {
+      patterns.push('Component-Based Frontend');
+    }
+    
+    if (directories.includes('lib') && directories.includes('bin')) {
+      patterns.push('Library Structure');
+    }
+    
+    return patterns;
+  }
+
+  private async analyzeFileTypes(repoPath: string): Promise<Map<string, number>> {
+    console.log('📄 Analyzing file types...');
+    
+    const fileTypes = new Map<string, number>();
+    
+    const analyzeDirectory = async (dirPath: string): Promise<void> => {
+      try {
+        const items = await fs.readdir(dirPath, { withFileTypes: true });
+        
+        for (const item of items) {
+          const fullPath = path.join(dirPath, item.name);
+          
+          if (this.shouldIgnoreItem(item.name)) continue;
+          
+          if (item.isDirectory()) {
+            await analyzeDirectory(fullPath);
+          } else {
+            const extension = path.extname(item.name).toLowerCase();
+            const key = extension || 'no-extension';
+            fileTypes.set(key, (fileTypes.get(key) || 0) + 1);
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️ Could not analyze directory ${dirPath}:`, error);
+      }
+    };
+    
+    await analyzeDirectory(repoPath);
+    
+    console.log(`✅ File types analyzed: ${fileTypes.size} different types`);
+    return fileTypes;
+  }
+
+  private async countTotalLines(repoPath: string): Promise<number> {
+    console.log('📊 Counting total lines of code...');
+    
+    let totalLines = 0;
+    const codeExtensions = ['.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.cpp', '.c', '.cs', '.php', '.rb', '.go'];
+    
+    const countLinesInDirectory = async (dirPath: string): Promise<void> => {
+      try {
+        const items = await fs.readdir(dirPath, { withFileTypes: true });
+        
+        for (const item of items) {
+          const fullPath = path.join(dirPath, item.name);
+          
+          if (this.shouldIgnoreItem(item.name)) continue;
+          
+          if (item.isDirectory()) {
+            await countLinesInDirectory(fullPath);
+          } else {
+            const extension = path.extname(item.name).toLowerCase();
+            if (codeExtensions.includes(extension)) {
+              try {
+                const content = await fs.readFile(fullPath, 'utf8');
+                const lines = content.split('\n').length;
+                totalLines += lines;
+              } catch (error) {
+                // Skip files that can't be read
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️ Could not count lines in directory ${dirPath}:`, error);
+      }
+    };
+    
+    await countLinesInDirectory(repoPath);
+    
+    console.log(`✅ Total lines counted: ${totalLines.toLocaleString()}`);
+    return totalLines;
+  }
+
+  private async detectLanguages(repoPath: string): Promise<string[]> {
+    console.log('🔍 Detecting programming languages...');
+    
+    const languageMap = new Map<string, string>([
+      ['.js', 'JavaScript'],
+      ['.ts', 'TypeScript'],
+      ['.jsx', 'JavaScript (React)'],
+      ['.tsx', 'TypeScript (React)'],
+      ['.py', 'Python'],
+      ['.java', 'Java'],
+      ['.cpp', 'C++'],
+      ['.c', 'C'],
+      ['.cs', 'C#'],
+      ['.php', 'PHP'],
+      ['.rb', 'Ruby'],
+      ['.go', 'Go'],
+      ['.rs', 'Rust'],
+      ['.swift', 'Swift'],
+      ['.kt', 'Kotlin'],
+      ['.scala', 'Scala'],
+      ['.html', 'HTML'],
+      ['.css', 'CSS'],
+      ['.scss', 'SCSS'],
+      ['.less', 'LESS'],
+      ['.vue', 'Vue.js'],
+      ['.svelte', 'Svelte']
+    ]);
+    
+    const detectedLanguages = new Set<string>();
+    
+    const scanDirectory = async (dirPath: string): Promise<void> => {
+      try {
+        const items = await fs.readdir(dirPath, { withFileTypes: true });
+        
+        for (const item of items) {
+          const fullPath = path.join(dirPath, item.name);
+          
+          if (this.shouldIgnoreItem(item.name)) continue;
+          
+          if (item.isDirectory()) {
+            await scanDirectory(fullPath);
+          } else {
+            const extension = path.extname(item.name).toLowerCase();
+            const language = languageMap.get(extension);
+            if (language) {
+              detectedLanguages.add(language);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️ Could not scan directory ${dirPath}:`, error);
+      }
+    };
+    
+    await scanDirectory(repoPath);
+    
+    const languages = Array.from(detectedLanguages);
+    console.log(`✅ Languages detected: ${languages.join(', ')}`);
+    return languages;
+  }
+  }
+
+  private async detectMVCPattern(repoPath: string): Promise<ArchitecturalPattern | null> {
+    console.log('🏗️ Detecting MVC pattern...');
+    
+    try {
+      const structure = await this.buildDirectoryStructure(repoPath);
+      const directories = this.extractDirectoryNames(structure.structure);
+      
+      // Look for MVC indicators
+      const mvcIndicators = ['models', 'views', 'controllers', 'controller', 'model', 'view'];
+      const foundIndicators = mvcIndicators.filter(indicator => 
+        directories.some(dir => dir.toLowerCase().includes(indicator))
+      );
+      
+      if (foundIndicators.length >= 2) {
+        const confidence = Math.min(foundIndicators.length / 3, 1.0);
+        
+        return {
+          name: 'MVC (Model-View-Controller)',
+          description: 'Separates application logic into Model, View, and Controller components',
+          files: foundIndicators.map(indicator => `${indicator}/`),
+          confidence
+        };
+      }
+      
+      // Check for MVC-related files
+      const mvcFiles = await this.findFilesWithPattern(repoPath, /.*[Cc]ontroller\.(js|ts|php|py|java)$/);
+      if (mvcFiles.length > 0) {
+        return {
+          name: 'MVC (Model-View-Controller)',
+          description: 'Uses controller-based architecture pattern',
+          files: mvcFiles.slice(0, 3),
+          confidence: Math.min(mvcFiles.length * 0.2, 0.8)
+        };
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Error detecting MVC pattern:', error);
+    }
+    
+    return null;
+  }
+
+  private async detectRepositoryPattern(repoPath: string): Promise<ArchitecturalPattern | null> {
+    console.log('🗄️ Detecting Repository pattern...');
+    
+    try {
+      const repositoryFiles = await this.findFilesWithPattern(repoPath, /.*[Rr]epository\.(js|ts|php|py|java|cs)$/);
+      const repositoryDirs = await this.findDirectoriesWithPattern(repoPath, /.*repositories?$/i);
+      
+      if (repositoryFiles.length > 0 || repositoryDirs.length > 0) {
+        const confidence = Math.min((repositoryFiles.length * 0.3) + (repositoryDirs.length * 0.4), 1.0);
+        
+        return {
+          name: 'Repository Pattern',
+          description: 'Encapsulates data access logic and provides a uniform interface to access data',
+          files: [...repositoryFiles.slice(0, 3), ...repositoryDirs.map(dir => `${dir}/`)],
+          confidence
+        };
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Error detecting Repository pattern:', error);
+    }
+    
+    return null;
+  }
+
+  private async detectFactoryPattern(repoPath: string): Promise<ArchitecturalPattern | null> {
+    console.log('🏭 Detecting Factory pattern...');
+    
+    try {
+      const factoryFiles = await this.findFilesWithPattern(repoPath, /.*[Ff]actory\.(js|ts|php|py|java|cs)$/);
+      const builderFiles = await this.findFilesWithPattern(repoPath, /.*[Bb]uilder\.(js|ts|php|py|java|cs)$/);
+      
+      if (factoryFiles.length > 0 || builderFiles.length > 0) {
+        const confidence = Math.min((factoryFiles.length * 0.4) + (builderFiles.length * 0.3), 1.0);
+        
+        return {
+          name: 'Factory Pattern',
+          description: 'Creates objects without specifying their concrete classes',
+          files: [...factoryFiles.slice(0, 2), ...builderFiles.slice(0, 2)],
+          confidence
+        };
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Error detecting Factory pattern:', error);
+    }
+    
+    return null;
+  }
+
+  private async detectObserverPattern(repoPath: string): Promise<ArchitecturalPattern | null> {
+    console.log('👁️ Detecting Observer pattern...');
+    
+    try {
+      const observerFiles = await this.findFilesWithPattern(repoPath, /.*[Oo]bserver\.(js|ts|php|py|java|cs)$/);
+      const eventFiles = await this.findFilesWithPattern(repoPath, /.*[Ee]vent.*\.(js|ts|php|py|java|cs)$/);
+      const listenerFiles = await this.findFilesWithPattern(repoPath, /.*[Ll]istener\.(js|ts|php|py|java|cs)$/);
+      
+      const totalFiles = observerFiles.length + eventFiles.length + listenerFiles.length;
+      
+      if (totalFiles > 0) {
+        const confidence = Math.min(totalFiles * 0.2, 1.0);
+        
+        return {
+          name: 'Observer Pattern',
+          description: 'Defines a subscription mechanism to notify multiple objects about events',
+          files: [...observerFiles.slice(0, 2), ...eventFiles.slice(0, 2), ...listenerFiles.slice(0, 2)],
+          confidence
+        };
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Error detecting Observer pattern:', error);
+    }
+    
+    return null;
+  }
+
+  private async detectSingletonPattern(repoPath: string): Promise<ArchitecturalPattern | null> {
+    console.log('🔒 Detecting Singleton pattern...');
+    
+    try {
+      const singletonFiles = await this.findFilesWithPattern(repoPath, /.*[Ss]ingleton\.(js|ts|php|py|java|cs)$/);
+      
+      if (singletonFiles.length > 0) {
+        return {
+          name: 'Singleton Pattern',
+          description: 'Ensures a class has only one instance and provides global access to it',
+          files: singletonFiles,
+          confidence: Math.min(singletonFiles.length * 0.5, 1.0)
+        };
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Error detecting Singleton pattern:', error);
+    }
+    
+    return null;
+  }
+
+  private async getRecentCommits(repoPath: string): Promise<GitCommit[]> {
+    console.log('📜 Getting recent commits...');
+    
+    try {
+      const git = simpleGit(repoPath);
+      const log = await git.log({ maxCount: 50 });
+      
+      return log.all.map(commit => ({
+        hash: commit.hash,
+        message: commit.message,
+        author: commit.author_name,
+        date: new Date(commit.date),
+        files: [] // Would need additional git command to get changed files
+      }));
+      
+    } catch (error) {
+      console.warn('⚠️ Could not get recent commits:', error);
+      return [];
+    }
+  }
+
+  private async extractPatternsFromCommits(commits: GitCommit[]): Promise<HistoricalPattern[]> {
+    console.log('📊 Extracting patterns from commits...');
+    
+    const patterns: HistoricalPattern[] = [];
+    
+    try {
+      // Analyze commit frequency
+      const commitsByDay = new Map<string, number>();
+      commits.forEach(commit => {
+        const day = commit.date.toISOString().split('T')[0];
+        commitsByDay.set(day, (commitsByDay.get(day) || 0) + 1);
+      });
+      
+      if (commitsByDay.size > 0) {
+        const avgCommitsPerDay = Array.from(commitsByDay.values()).reduce((a, b) => a + b, 0) / commitsByDay.size;
+        patterns.push({
+          type: 'commit-frequency',
+          description: `Average ${avgCommitsPerDay.toFixed(1)} commits per active day`,
+          frequency: avgCommitsPerDay,
+          confidence: 0.8
+        });
+      }
+      
+      // Analyze commit message patterns
+      const bugFixCommits = commits.filter(c => 
+        /fix|bug|issue|error|problem/i.test(c.message)
+      ).length;
+      
+      if (bugFixCommits > 0) {
+        patterns.push({
+          type: 'bug-fix-pattern',
+          description: `${bugFixCommits} bug fix commits out of ${commits.length} recent commits`,
+          frequency: bugFixCommits / commits.length,
+          confidence: 0.7
+        });
+      }
+      
+      // Analyze feature development patterns
+      const featureCommits = commits.filter(c => 
+        /feat|feature|add|implement|new/i.test(c.message)
+      ).length;
+      
+      if (featureCommits > 0) {
+        patterns.push({
+          type: 'feature-development',
+          description: `${featureCommits} feature development commits`,
+          frequency: featureCommits / commits.length,
+          confidence: 0.7
+        });
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Error extracting commit patterns:', error);
+    }
+    
+    console.log(`✅ Extracted ${patterns.length} historical patterns`);
+    return patterns;
+  }
+
+  private async calculateComplexity(repoPath: string): Promise<number> {
+    console.log('🧮 Calculating code complexity...');
+    
+    let totalComplexity = 0;
+    let fileCount = 0;
+    
+    try {
+      const codeFiles = await this.findFilesWithPattern(repoPath, /\.(js|ts|jsx|tsx|py|java|cpp|c|cs|php|rb)$/);
+      
+      for (const file of codeFiles.slice(0, 50)) { // Limit to first 50 files for performance
+        try {
+          const content = await fs.readFile(path.join(repoPath, file), 'utf8');
+          const complexity = this.calculateFileComplexity(content);
+          totalComplexity += complexity;
+          fileCount++;
+        } catch (error) {
+          // Skip files that can't be read
+        }
+      }
+      
+    } catch (error) {
+      console.warn('⚠️ Error calculating complexity:', error);
+    }
+    
+    const avgComplexity = fileCount > 0 ? totalComplexity / fileCount : 0;
+    console.log(`✅ Average complexity: ${avgComplexity.toFixed(2)} (${fileCount} files analyzed)`);
+    return avgComplexity;
+  }
+
+  private calculateFileComplexity(content: string): number {
+    // Simple cyclomatic complexity calculation
+    let complexity = 1; // Base complexity
+    
+    // Count decision points
+    const decisionPatterns = [
+      /\bif\s*\(/g,
+      /\belse\s+if\s*\(/g,
+      /\bwhile\s*\(/g,
+      /\bfor\s*\(/g,
+      /\bswitch\s*\(/g,
+      /\bcase\s+/g,
+      /\bcatch\s*\(/g,
+      /\?\s*.*\s*:/g, // Ternary operator
+      /&&/g,
+      /\|\|/g
+    ];
+    
+    decisionPatterns.forEach(pattern => {
+      const matches = content.match(pattern);
+      if (matches) {
+        complexity += matches.length;
+      }
+    });
+    
+    return complexity;
+  }
+
+  private async calculateTestCoverage(repoPath: string): Promise<number> {
+    console.log('🧪 Calculating test coverage...');
+    
+    try {
+      // Look for test files
+      const testFiles = await this.findFilesWithPattern(repoPath, /\.(test|spec)\.(js|ts|jsx|tsx|py|java|cpp|c|cs|php|rb)$/);
+      const allCodeFiles = await this.findFilesWithPattern(repoPath, /\.(js|ts|jsx|tsx|py|java|cpp|c|cs|php|rb)$/);
+      
+      // Filter out test files from code files
+      const codeFiles = allCodeFiles.filter(file => 
+        !/(test|spec|__tests__|tests)/i.test(file)
+      );
+      
+      if (codeFiles.length === 0) {
+        return 0;
+      }
+      
+      // Simple heuristic: assume each test file covers multiple source files
+      const estimatedCoverage = Math.min((testFiles.length * 2) / codeFiles.length, 1.0);
+      
+      console.log(`✅ Estimated test coverage: ${(estimatedCoverage * 100).toFixed(1)}% (${testFiles.length} test files, ${codeFiles.length} code files)`);
+      return estimatedCoverage;
+      
+    } catch (error) {
+      console.warn('⚠️ Error calculating test coverage:', error);
+      return 0;
+    }
+  }
+
+  private async calculateDuplication(repoPath: string): Promise<number> {
+    console.log('🔄 Calculating code duplication...');
+    
+    try {
+      // Simple duplication detection based on similar function signatures
+      const codeFiles = await this.findFilesWithPattern(repoPath, /\.(js|ts|jsx|tsx)$/);
+      const functionSignatures = new Map<string, number>();
+      
+      for (const file of codeFiles.slice(0, 30)) { // Limit for performance
+        try {
+          const content = await fs.readFile(path.join(repoPath, file), 'utf8');
+          const functions = this.extractFunctionSignatures(content);
+          
+          functions.forEach(signature => {
+            functionSignatures.set(signature, (functionSignatures.get(signature) || 0) + 1);
+          });
+        } catch (error) {
+          // Skip files that can't be read
+        }
+      }
+      
+      const duplicatedFunctions = Array.from(functionSignatures.values()).filter(count => count > 1);
+      const totalFunctions = Array.from(functionSignatures.values()).reduce((a, b) => a + b, 0);
+      
+      const duplicationRatio = totalFunctions > 0 ? duplicatedFunctions.length / totalFunctions : 0;
+      
+      console.log(`✅ Code duplication: ${(duplicationRatio * 100).toFixed(1)}%`);
+      return duplicationRatio;
+      
+    } catch (error) {
+      console.warn('⚠️ Error calculating duplication:', error);
+      return 0;
+    }
+  }
+
+  private extractFunctionSignatures(content: string): string[] {
+    const signatures: string[] = [];
+    
+    // Simple regex patterns for function signatures
+    const patterns = [
+      /function\s+(\w+)\s*\([^)]*\)/g,
+      /(\w+)\s*:\s*function\s*\([^)]*\)/g,
+      /(\w+)\s*=>\s*{/g,
+      /(\w+)\s*\([^)]*\)\s*{/g
+    ];
+    
+    patterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(content)) !== null) {
+        signatures.push(match[1] || match[0]);
+      }
+    });
+    
+    return signatures;
+  }
+
+  private async calculateMaintainabilityIndex(repoPath: string): Promise<number> {
+    console.log('🔧 Calculating maintainability index...');
+    
+    try {
+      const complexity = await this.calculateComplexity(repoPath);
+      const duplication = await this.calculateDuplication(repoPath);
+      const testCoverage = await this.calculateTestCoverage(repoPath);
+      
+      // Simple maintainability index calculation
+      // Higher is better, scale 0-100
+      const maintainabilityIndex = Math.max(0, Math.min(100, 
+        100 - (complexity * 5) - (duplication * 50) + (testCoverage * 20)
+      ));
+      
+      console.log(`✅ Maintainability index: ${maintainabilityIndex.toFixed(1)}/100`);
+      return maintainabilityIndex / 100; // Normalize to 0-1
+      
+    } catch (error) {
+      console.warn('⚠️ Error calculating maintainability index:', error);
+      return 0.5; // Default middle value
+    }
+  }
+  }
+
+  private async getCompleteFile(file: string, repoPath: string): Promise<string> {
+    try {
+      const filePath = path.join(repoPath, file);
+      return await fs.readFile(filePath, 'utf-8');
+    } catch (error) {
+      console.warn(`⚠️ Could not read file ${file}:`, error);
+      return '';
+    }
+  }
+
+  private async getRelatedFunctions(file: string, blastRadius: BlastRadius, repoPath: string): Promise<any[]> {
+    console.log(`🔗 Getting related functions for ${file}...`);
+    
+    try {
+      const relatedFiles = [
+        ...blastRadius.directImpact,
+        ...blastRadius.indirectImpact
+      ].filter(f => f !== file);
+      
+      const relatedFunctions: any[] = [];
+      
+      for (const relatedFile of relatedFiles.slice(0, 5)) { // Limit for performance
+        try {
+          const content = await this.getCompleteFile(relatedFile, repoPath);
+          const functions = this.extractFunctionSignatures(content);
+          functions.forEach(func => {
+            relatedFunctions.push({
+              name: func,
+              file: relatedFile,
+              type: 'function'
+            });
+          });
+        } catch (error) {
+          // Skip files that can't be read
+        }
+      }
+      
+      return relatedFunctions.slice(0, 10); // Return top 10 related functions
+      
+    } catch (error) {
+      console.warn(`⚠️ Error getting related functions for ${file}:`, error);
+      return [];
+    }
+  }
+
+  private async getDependencyChain(file: string, repoPath: string): Promise<any> {
+    console.log(`📦 Getting dependency chain for ${file}...`);
+    
+    try {
+      const content = await this.getCompleteFile(file, repoPath);
+      const imports: string[] = [];
+      const exports: string[] = [];
+      
+      // Extract import statements
+      const importPatterns = [
+        /import.*from\s+['"]([^'"]+)['"]/g,
+        /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+        /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g
+      ];
+      
+      importPatterns.forEach(pattern => {
+        let match;
+        while ((match = pattern.exec(content)) !== null) {
+          imports.push(match[1]);
+        }
+      });
+      
+      // Extract export statements
+      const exportPatterns = [
+        /export\s+(?:default\s+)?(?:class|function|const|let|var)\s+(\w+)/g,
+        /export\s*{\s*([^}]+)\s*}/g
+      ];
+      
+      exportPatterns.forEach(pattern => {
+        let match;
+        while ((match = pattern.exec(content)) !== null) {
+          if (match[1].includes(',')) {
+            // Multiple exports
+            exports.push(...match[1].split(',').map(e => e.trim()));
+          } else {
+            exports.push(match[1]);
+          }
+        }
+      });
+      
+      return {
+        imports: imports.slice(0, 10),
+        exports: exports.slice(0, 10),
+        transitiveDependencies: [] // Would need deeper analysis
+      };
+      
+    } catch (error) {
+      console.warn(`⚠️ Error getting dependency chain for ${file}:`, error);
+      return { imports: [], exports: [], transitiveDependencies: [] };
+    }
+  }
+
+  private async getUsageExamples(file: string, repoPath: string): Promise<any[]> {
+    console.log(`📝 Getting usage examples for ${file}...`);
+    
+    try {
+      const content = await this.getCompleteFile(file, repoPath);
+      const examples: any[] = [];
+      
+      // Extract function calls and usage patterns
+      const lines = content.split('\n');
+      
+      for (let i = 0; i < lines.length && examples.length < 5; i++) {
+        const line = lines[i].trim();
+        
+        // Look for function calls, method invocations, etc.
+        if (line.includes('(') && line.includes(')') && !line.startsWith('//') && !line.startsWith('*')) {
+          examples.push({
+            line: i + 1,
+            code: line,
+            type: 'function-call'
+          });
+        }
+      }
+      
+      return examples;
+      
+    } catch (error) {
+      console.warn(`⚠️ Error getting usage examples for ${file}:`, error);
+      return [];
+    }
+  }
+
+  private async getTestCoverage(file: string, repoPath: string): Promise<any[]> {
+    console.log(`🧪 Getting test coverage for ${file}...`);
+    
+    try {
+      const fileName = path.basename(file, path.extname(file));
+      const fileDir = path.dirname(file);
+      
+      // Look for corresponding test files
+      const testPatterns = [
+        path.join(fileDir, `${fileName}.test.js`),
+        path.join(fileDir, `${fileName}.test.ts`),
+        path.join(fileDir, `${fileName}.spec.js`),
+        path.join(fileDir, `${fileName}.spec.ts`),
+        path.join(fileDir, '__tests__', `${fileName}.test.js`),
+        path.join(fileDir, '__tests__', `${fileName}.test.ts`)
+      ];
+      
+      const existingTests: any[] = [];
+      
+      for (const testPath of testPatterns) {
+        try {
+          const fullTestPath = path.join(repoPath, testPath);
+          await fs.access(fullTestPath);
+          existingTests.push({
+            file: testPath,
+            type: 'test-file',
+            exists: true
+          });
+        } catch (error) {
+          // Test file doesn't exist
+        }
+      }
+      
+      return existingTests;
+      
+    } catch (error) {
+      console.warn(`⚠️ Error getting test coverage for ${file}:`, error);
+      return [];
+    }
+  }
+
+  private async getHistoricalContext(file: string, repoPath: string): Promise<any> {
+    console.log(`📜 Getting historical context for ${file}...`);
+    
+    try {
+      const git = simpleGit(repoPath);
+      const log = await git.log({ file: file, maxCount: 10 });
+      
+      return {
+        recentCommits: log.all.slice(0, 5).map(commit => ({
+          hash: commit.hash.substring(0, 8),
+          message: commit.message,
+          author: commit.author_name,
+          date: commit.date
+        })),
+        totalCommits: log.total,
+        lastModified: log.latest?.date || null
+      };
+      
+    } catch (error) {
+      console.warn(`⚠️ Error getting historical context for ${file}:`, error);
+      return {
+        recentCommits: [],
+        totalCommits: 0,
+        lastModified: null
+      };
+    }
+  }
+
+  // Helper methods for pattern detection
+  private extractDirectoryNames(structure: any): string[] {
+    const directories: string[] = [];
+    
+    const extractRecursive = (obj: any, prefix: string = '') => {
+      Object.keys(obj).forEach(key => {
+        if (typeof obj[key] === 'object' && obj[key].type !== 'file') {
+          directories.push(prefix + key);
+          extractRecursive(obj[key], prefix + key + '/');
+        }
+      });
+    };
+    
+    extractRecursive(structure);
+    return directories;
+  }
+
+  private async findFilesWithPattern(repoPath: string, pattern: RegExp): Promise<string[]> {
+    const matchingFiles: string[] = [];
+    
+    const searchDirectory = async (dirPath: string): Promise<void> => {
+      try {
+        const items = await fs.readdir(dirPath, { withFileTypes: true });
+        
+        for (const item of items) {
+          const fullPath = path.join(dirPath, item.name);
+          const relativePath = path.relative(repoPath, fullPath);
+          
+          if (this.shouldIgnoreItem(item.name)) continue;
+          
+          if (item.isDirectory()) {
+            await searchDirectory(fullPath);
+          } else if (pattern.test(item.name)) {
+            matchingFiles.push(relativePath);
+          }
+        }
+      } catch (error) {
+        // Skip directories that can't be read
+      }
+    };
+    
+    await searchDirectory(repoPath);
+    return matchingFiles;
+  }
+
+  private async findDirectoriesWithPattern(repoPath: string, pattern: RegExp): Promise<string[]> {
+    const matchingDirs: string[] = [];
+    
+    const searchDirectory = async (dirPath: string): Promise<void> => {
+      try {
+        const items = await fs.readdir(dirPath, { withFileTypes: true });
+        
+        for (const item of items) {
+          const fullPath = path.join(dirPath, item.name);
+          
+          if (this.shouldIgnoreItem(item.name)) continue;
+          
+          if (item.isDirectory()) {
+            if (pattern.test(item.name)) {
+              matchingDirs.push(path.relative(repoPath, fullPath));
+            }
+            await searchDirectory(fullPath);
+          }
+        }
+      } catch (error) {
+        // Skip directories that can't be read
+      }
+    };
+    
+    await searchDirectory(repoPath);
+    return matchingDirs;
+  }
+
+  private async searchForPattern(repoPath: string, pattern: RegExp): Promise<number> {
+    let matchCount = 0;
+    const codeFiles = await this.findFilesWithPattern(repoPath, /\.(js|ts|jsx|tsx|py|java|cpp|c|cs|php|rb)$/);
+    
+    for (const file of codeFiles.slice(0, 20)) { // Limit for performance
+      try {
+        const content = await this.getCompleteFile(file, repoPath);
+        const matches = content.match(pattern);
+        if (matches) {
+          matchCount += matches.length;
+        }
+      } catch (error) {
+        // Skip files that can't be read
+      }
+    }
+    
+    return matchCount;
+  }
+
+  private async getTestCoverage(file: string, repoPath: string): Promise<any> {
+    // Implementation would get test coverage info
+    return { covered: false, testFiles: [], coveragePercentage: 0 };
+  }
+
+  private async getHistoricalContext(file: string, repoPath: string): Promise<any> {
+    // Implementation would get historical context
+    return { recentChanges: [], changeFrequency: 0, bugHistory: [] };
+  }
+}
+
+// Placeholder services that would be implemented
+class GitService {
+  // Git operations
+}
+
+class ASTService {
+  async findRelatedCode(changedFiles: string[], repoPath: string): Promise<any> {
+    return {
+      directDependencies: [],
+      transitiveDependencies: [],
+      affectedTests: []
+    };
+  }
+}
+
+class DependencyService {
+  async analyzePRDependencies(changedFiles: string[], repoPath: string): Promise<any> {
+    return {
+      documentationFiles: [],
+      migrationFiles: [],
+      configFiles: []
+    };
+  }
+
+  async buildDependencyGraph(repoPath: string): Promise<DependencyGraph> {
+    return {
+      nodes: [],
+      edges: [],
+      cycles: []
+    };
+  }
+}
