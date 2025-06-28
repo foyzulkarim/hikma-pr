@@ -107,13 +107,38 @@ export async function startUIServer(options: { port?: number; open?: boolean } =
     });
   });
   
+  // Build the application for production
+  console.log(chalk.blue('🔨 Building application...'));
+  await new Promise<void>((resolve, reject) => {
+    const buildProcess = spawn('npm', ['run', 'build'], {
+      cwd: guiPath,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env
+    });
+    
+    buildProcess.on('close', (code) => {
+      if (code === 0) {
+        console.log(chalk.green('✅ Application built successfully!'));
+        resolve();
+      } else {
+        console.error(chalk.red('❌ Build failed'));
+        reject(new Error(`Build failed with code ${code}`));
+      }
+    });
+    
+    buildProcess.on('error', (error: Error) => {
+      console.error(chalk.red('❌ Build process failed:'), error.message);
+      reject(error);
+    });
+  });
+  
   console.log(chalk.green('🎉 Starting the web interface...'));
   console.log(chalk.cyan(`📱 Open your browser to: http://localhost:${port}`));
   console.log(chalk.gray('💡 Press Ctrl+C to stop the server'));
   console.log('');
   
-  // Start the Next.js development server
-  const devProcess = spawn('npm', ['exec', '--', 'next', 'dev'], {
+  // Start the Next.js production server
+  const devProcess = spawn('npm', ['exec', '--', 'next', 'start'], {
     cwd: guiPath,
     stdio: 'inherit',
     env

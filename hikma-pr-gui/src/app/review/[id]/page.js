@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import parse from 'parse-diff'
 
 export default function ReviewDetail() {
   const params = useParams()
