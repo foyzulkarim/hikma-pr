@@ -26,7 +26,7 @@ const DEFAULTS = {
 export function loadConfiguration(): AppConfig {
   // Load environment variables from user's home directory .env file
   // This does not override existing process.env variables
-  const userConfigPath = path.join(os.homedir(), '.hikma-pr', '.env');
+  const userConfigPath = path.join(os.homedir(), '.hikmapr', '.env');
   dotenv.config({ path: userConfigPath });
 
   // Get values from command-line options, if provided

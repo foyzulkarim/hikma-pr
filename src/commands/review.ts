@@ -284,7 +284,7 @@ ${prDetails.body || '*No description provided*'}
  */
 const saveMarkdownReport = (markdown: string, prUrl: string, taskId: string): string => {
   // Create reports directory if it doesn't exist
-  const reportsDir = path.join(os.homedir(), '.hikma-pr', 'reports');
+  const reportsDir = path.join(os.homedir(), '.hikmapr', 'reports');
   if (!fs.existsSync(reportsDir)) {
     fs.mkdirSync(reportsDir, { recursive: true });
   }

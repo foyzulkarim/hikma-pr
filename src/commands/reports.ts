@@ -5,12 +5,13 @@ import { PrismaClient } from '@prisma/client';
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 /**
  * Lists all saved markdown reports
  */
 export const listReportsHandler = async () => {
-  const reportsDir = path.join(process.cwd(), 'reports');
+  const reportsDir = path.join(os.homedir(), '.hikmapr', 'reports');
   
   if (!fs.existsSync(reportsDir)) {
     console.log(chalk.yellow(`📄 No reports directory found. Reports will be saved to: ${reportsDir}`));
@@ -64,7 +65,7 @@ export const listReportsHandler = async () => {
  * Views a specific report by index or filename
  */
 export const viewReportHandler = async (identifier: string) => {
-  const reportsDir = path.join(process.cwd(), 'reports');
+  const reportsDir = path.join(os.homedir(), '.hikmapr', 'reports');
   
   if (!fs.existsSync(reportsDir)) {
     console.log(chalk.red(`❌ No reports directory found: ${reportsDir}`));
@@ -180,7 +181,7 @@ export const viewFileAnalysesHandler = async (taskId: string) => {
  * Cleans up old reports (optional utility)
  */
 export const cleanReportsHandler = async (daysOld: number = 30) => {
-  const reportsDir = path.join(process.cwd(), 'reports');
+  const reportsDir = path.join(os.homedir(), '.hikmapr', 'reports');
   
   if (!fs.existsSync(reportsDir)) {
     console.log(chalk.yellow(`📄 No reports directory found.`));

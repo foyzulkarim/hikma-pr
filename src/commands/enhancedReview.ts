@@ -7,6 +7,7 @@ import ora from 'ora';
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 import { ComprehensiveReviewWorkflow } from '../workflows/comprehensiveReviewWorkflow.js';
 import { ComprehensiveReview } from '../types/analysis.js';
@@ -205,50 +206,50 @@ async function saveComprehensiveResults(
       }
     });
 
-    // Save detailed findings
-    const allFindings = [
-      ...review.detailedAnalysis.architectural.findings,
-      ...review.detailedAnalysis.security.findings,
-      ...review.detailedAnalysis.performance.findings,
-      ...review.detailedAnalysis.testing.findings
-    ];
+    // Save detailed findings - DISABLED: Tables removed in schema cleanup
+    // const allFindings = [
+    //   ...review.detailedAnalysis.architectural.findings,
+    //   ...review.detailedAnalysis.security.findings,
+    //   ...review.detailedAnalysis.performance.findings,
+    //   ...review.detailedAnalysis.testing.findings
+    // ];
 
-    for (const finding of allFindings) {
-      await prisma.finding.create({
-        data: {
-          id: finding.id,
-          reviewId: taskId,
-          type: finding.type,
-          severity: finding.severity,
-          message: finding.message,
-          file: finding.file,
-          lineNumber: finding.lineNumber,
-          evidence: finding.evidence
-        }
-      });
-    }
+    // for (const finding of allFindings) {
+    //   await prisma.finding.create({
+    //     data: {
+    //       id: finding.id,
+    //       reviewId: taskId,
+    //       type: finding.type,
+    //       severity: finding.severity,
+    //       message: finding.message,
+    //       file: finding.file,
+    //       lineNumber: finding.lineNumber,
+    //       evidence: finding.evidence
+    //     }
+    //   });
+    // }
 
-    // Save recommendations
-    const allRecommendations = [
-      ...review.recommendations.mustFix,
-      ...review.recommendations.shouldFix,
-      ...review.recommendations.consider
-    ];
+    // Save recommendations - DISABLED: Tables removed in schema cleanup
+    // const allRecommendations = [
+    //   ...review.recommendations.mustFix,
+    //   ...review.recommendations.shouldFix,
+    //   ...review.recommendations.consider
+    // ];
 
-    for (const rec of allRecommendations) {
-      await prisma.recommendation.create({
-        data: {
-          id: rec.id,
-          reviewId: taskId,
-          priority: rec.priority,
-          category: rec.category,
-          description: rec.description,
-          rationale: rec.rationale,
-          implementation: rec.implementation,
-          effort: rec.effort
-        }
-      });
-    }
+    // for (const rec of allRecommendations) {
+    //   await prisma.recommendation.create({
+    //     data: {
+    //       id: rec.id,
+    //       reviewId: taskId,
+    //       priority: rec.priority,
+    //       category: rec.category,
+    //       description: rec.description,
+    //       rationale: rec.rationale,
+    //       implementation: rec.implementation,
+    //       effort: rec.effort
+    //     }
+    //   });
+    // }
 
     spinner.succeed('Comprehensive results saved to database');
     
@@ -404,8 +405,8 @@ function formatRecommendation(rec: any): string {
 }
 
 function saveMarkdownReport(markdown: string, prUrl: string, taskId: string): string {
-  // Create reports directory if it doesn't exist (matching your original system)
-  const reportsDir = path.join(process.cwd(), 'reports');
+  // Create reports directory if it doesn't exist
+  const reportsDir = path.join(os.homedir(), '.hikmapr', 'reports');
   if (!fs.existsSync(reportsDir)) {
     fs.mkdirSync(reportsDir, { recursive: true });
   }
@@ -437,7 +438,7 @@ function saveJsonReport(review: ComprehensiveReview, prUrl: string, taskId: stri
   const prNumber = urlMatch ? urlMatch[3] : 'unknown';
   
   const filename = `hikma-pr-${repo}-${prNumber}-${taskId.slice(0, 8)}.json`;
-  const reportPath = path.join(process.cwd(), 'reports', filename);
+  const reportPath = path.join(os.homedir(), '.hikmapr', 'reports', filename);
   
   fs.writeFileSync(reportPath, JSON.stringify(review, null, 2), 'utf8');
   return reportPath;
@@ -464,7 +465,7 @@ ${review.executiveSummary.keyFindings.map(finding => `• ${finding}`).join('\n'
 `;
   
   const filename = `hikma-pr-summary-${repo}-${prNumber}-${taskId.slice(0, 8)}.md`;
-  const reportPath = path.join(process.cwd(), 'reports', filename);
+  const reportPath = path.join(os.homedir(), '.hikmapr', 'reports', filename);
   
   fs.writeFileSync(reportPath, summary, 'utf8');
   return reportPath;
