@@ -41,7 +41,13 @@ try {
   console.log('');
   console.log('🎉 You can now use: npx hikma-pr review --help');
   console.log('');
+console.log('🎉 You can now use: npx hikma-pr review --help');
+  console.log('');
 } catch (error) {
+  console.error('⚠️  Error during setup:', error);
+  console.log('⚠️  Initial setup encountered some issues, but this is normal for first-time installation.');
+  console.log('   The application will complete setup automatically when you run your first command.');
+  console.log('');
   console.log('⚠️  Initial setup encountered some issues, but this is normal for first-time installation.');
   console.log('   The application will complete setup automatically when you run your first command.');
   console.log('');
