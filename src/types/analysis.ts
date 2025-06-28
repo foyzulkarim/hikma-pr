@@ -1,5 +1,7 @@
 // Analysis Types for Multi-Pass PR Review Architecture
 
+import { PluginFinding } from './plugins';
+
 export interface PrContext {
   repo_name: string;
   source_branch: string;
@@ -91,6 +93,7 @@ export interface ReviewState {
       security_performance?: AnalysisPass;
       architecture_design?: AnalysisPass;
       testing_docs?: AnalysisPass;
+      plugin_findings?: PluginFinding[]; // Add this line
     };
   };
   file_results?: {

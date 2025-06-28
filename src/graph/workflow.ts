@@ -14,6 +14,7 @@ import { ReviewState, AnalysisConfig, ChunkInfo, AnalysisPass, Provider } from '
 import { FileFilterService } from '../services/fileFilterService';
 import { ChunkService } from '../services/chunkService';
 import { AnalysisService } from '../services/analysisService';
+import { PluginService } from '../services/pluginService';
 import { getPrDetailsViaCli, getChangedFilesViaCli, getFullPrDiffViaCli, extractFileFromFullDiff } from '../services/githubService';
 import { PromptBuilder } from '../prompts/templates';
 import { PrismaClient } from '@prisma/client';
@@ -104,10 +105,10 @@ let prisma: PrismaClient;
 /**
  * Initialize services
  */
-function initializeServices(config: Partial<AnalysisConfig>) {
+function initializeServices(config: Partial<AnalysisConfig>, pluginService?: PluginService) {
   fileFilterService = new FileFilterService(config.project);
   chunkService = new ChunkService(config.project || {});
-  analysisService = new AnalysisService(config as AnalysisConfig);
+  analysisService = new AnalysisService(config as AnalysisConfig, pluginService);
   prisma = new PrismaClient();
   console.log(chalk.blue(`🚀 Enhanced workflow services initialized`));
 }
@@ -365,9 +366,9 @@ workflow.addNode("analyzeChunk", async (state: ReviewState) => {
   // Perform 4-pass analysis
   const chunkAnalysis = await analysisService.analyzeChunk(currentChunk);
 
-  // Save analysis passes to database
+  // Save analysis passes to database (excluding plugin findings)
   for (const [passType, analysis] of Object.entries(chunkAnalysis)) {
-    if (analysis) {
+    if (analysis && passType !== 'plugin_findings' && typeof analysis === 'object' && 'analysis_result' in analysis) {
       await prisma.analysisPass.create({
         data: {
           reviewId: state.task_id,
@@ -382,6 +383,24 @@ workflow.addNode("analyzeChunk", async (state: ReviewState) => {
         }
       });
     }
+  }
+
+  // Save plugin findings to separate table
+  if (chunkAnalysis.plugin_findings && Array.isArray(chunkAnalysis.plugin_findings)) {
+    for (const finding of chunkAnalysis.plugin_findings) {
+      await prisma.pluginFinding.create({
+        data: {
+          reviewId: state.task_id,
+          chunkId: currentChunk.id,
+          pluginId: finding.pluginId,
+          pluginName: finding.pluginName,
+          message: finding.message,
+          severity: finding.severity,
+          line: finding.line || null
+        }
+      });
+    }
+    console.log(chalk.blue(`💾 Saved ${chunkAnalysis.plugin_findings.length} plugin findings to database`));
   }
 
   console.log(chalk.green(`✅ 4-pass analysis completed for chunk ${currentChunk.id.slice(0, 8)}`));
@@ -440,101 +459,8 @@ workflow.addNode("synthesizeFile", async (state: ReviewState) => {
 
 /**
  * Node 6: Final Synthesis
+ * Note: This node is redefined in getAppWithConfig() to ensure proper access to analysisService
  */
-workflow.addNode("finalSynthesis", async (state: ReviewState) => {
-  console.log(chalk.bold.blue(`🏃 Node: finalSynthesis`));
-
-  // Collect all file results
-  const fileResults = state.file_results || {};
-  const fileCount = Object.keys(fileResults).length;
-
-  if (fileCount === 0) {
-    console.log(chalk.yellow(`⚠️  No file results to synthesize`));
-    return {
-      final_report: "No files were analyzed due to filtering or errors."
-    };
-  }
-
-  // Prepare analysis summary
-  let analysisText = '';
-  let criticalIssues: string[] = [];
-  let importantRecommendations: string[] = [];
-  let minorSuggestions: string[] = [];
-
-  for (const [filePath, result] of Object.entries(fileResults)) {
-    analysisText += `
-## File: ${filePath}
-`;
-    analysisText += `Risk Level: ${result.overall_risk}
-`;
-    analysisText += `Total Issues: ${result.total_issues}
-`;
-    analysisText += `Analysis: ${result.file_synthesis}
-`;
-
-    // Categorize by risk level
-    if (result.overall_risk === 'CRITICAL' || result.overall_risk === 'HIGH') {
-      criticalIssues.push(`${filePath}: ${result.total_issues} issues (${result.overall_risk})`);
-    } else if (result.overall_risk === 'MEDIUM') {
-      importantRecommendations.push(`${filePath}: Review recommended`);
-    } else {
-      minorSuggestions.push(`${filePath}: Low risk, minor improvements possible`);
-    }
-  }
-
-  // Determine overall decision
-  const hasCritical = criticalIssues.length > 0;
-  const hasImportant = importantRecommendations.length > 0;
-
-  let decision: 'APPROVE' | 'REQUEST_CHANGES' | 'REJECT' = 'APPROVE';
-  let reasoning = 'No significant issues found.';
-
-  if (hasCritical) {
-    decision = criticalIssues.length > fileCount / 2 ? 'REJECT' : 'REQUEST_CHANGES';
-    reasoning = `Found ${criticalIssues.length} files with critical/high risk issues.`;
-  } else if (hasImportant) {
-    decision = 'REQUEST_CHANGES';
-    reasoning = `Found ${importantRecommendations.length} files that would benefit from improvements.`;
-  }
-
-  const synthesisData = {
-    critical_issues: criticalIssues,
-    important_recommendations: importantRecommendations,
-    minor_suggestions: minorSuggestions,
-    overall_assessment: `Analyzed ${fileCount} files with ${decision.toLowerCase()} recommendation.`,
-    decision,
-    reasoning
-  };
-
-  // Generate final report using LLM
-  const finalReportPrompt = PromptBuilder.buildSynthesisPrompt(
-    state.pr_details?.title || 'No title',
-    'Unknown author', // TODO: Get from PR details
-    fileCount,
-    Object.keys(state.chunk_analyses || {}).length,
-    analysisText
-  );
-
-  console.log(chalk.magenta(`🤖 Generating final report...`));
-
-  const finalReport = await analysisService['llmClient'].generate(finalReportPrompt, {
-    onData: (chunk: string) => {
-      process.stdout.write(chalk.magenta(chunk));
-    },
-    onComplete: () => {
-      console.log(); // New line
-      console.log(chalk.green(`✅ Final report synthesis completed`));
-    },
-    onError: (error: Error) => {
-      console.error(chalk.red(`❌ Streaming error:`), error.message);
-    }
-  });
-
-  return {
-    synthesis_data: synthesisData,
-    final_report: finalReport
-  };
-});
 
 // Set up the graph flow
 (workflow as any).setEntryPoint("establishContext");
@@ -573,17 +499,151 @@ workflow.addNode("finalSynthesis", async (state: ReviewState) => {
 );
 (workflow as any).addEdge("finalSynthesis", END);
 
-// Export the compiled workflow
-export const app = workflow.compile({
-  checkpointer: undefined,
-});
+// Note: Workflow compilation is done in getAppWithConfig() after services are initialized
 
-export const getAppWithConfig = (customConfig?: Partial<AnalysisConfig>) => {
+export const getAppWithConfig = (customConfig?: Partial<AnalysisConfig> & { pluginService?: PluginService }) => {
   const config = { ...DEFAULT_CONFIG, ...customConfig };
-  initializeServices(config as AnalysisConfig);
+  initializeServices(config as AnalysisConfig, customConfig?.pluginService);
+
+  // Re-create the finalSynthesis node with proper access to analysisService
+  workflow.addNode("finalSynthesis", async (state: ReviewState) => {
+    console.log(chalk.bold.blue(`🏃 Node: finalSynthesis`));
+
+    // Collect all file results
+    const fileResults = state.file_results || {};
+    const fileCount = Object.keys(fileResults).length;
+
+    if (fileCount === 0) {
+      console.log(chalk.yellow(`⚠️  No file results to synthesize`));
+      return {
+        final_report: "No files were analyzed due to filtering or errors."
+      };
+    }
+
+    // Prepare analysis summary
+    let analysisText = '';
+    let criticalIssues: string[] = [];
+    let importantRecommendations: string[] = [];
+    let minorSuggestions: string[] = [];
+
+    for (const [filePath, result] of Object.entries(fileResults)) {
+      analysisText += `
+## File: ${filePath}
+`;
+      analysisText += `Risk Level: ${result.overall_risk}
+`;
+      analysisText += `Total Issues: ${result.total_issues}
+`;
+      analysisText += `Analysis: ${result.file_synthesis}
+`;
+
+      // Categorize by risk level
+      if (result.overall_risk === 'CRITICAL' || result.overall_risk === 'HIGH') {
+        criticalIssues.push(`${filePath}: ${result.total_issues} issues (${result.overall_risk})`);
+      } else if (result.overall_risk === 'MEDIUM') {
+        importantRecommendations.push(`${filePath}: Review recommended`);
+      } else {
+        minorSuggestions.push(`${filePath}: Low risk, minor improvements possible`);
+      }
+    }
+
+    // Determine overall decision
+    const hasCritical = criticalIssues.length > 0;
+    const hasImportant = importantRecommendations.length > 0;
+
+    let decision: 'APPROVE' | 'REQUEST_CHANGES' | 'REJECT' = 'APPROVE';
+    let reasoning = 'No significant issues found.';
+
+    if (hasCritical) {
+      decision = criticalIssues.length > fileCount / 2 ? 'REJECT' : 'REQUEST_CHANGES';
+      reasoning = `Found ${criticalIssues.length} files with critical/high risk issues.`;
+    } else if (hasImportant) {
+      decision = 'REQUEST_CHANGES';
+      reasoning = `Found ${importantRecommendations.length} files that would benefit from improvements.`;
+    }
+
+    const synthesisData = {
+      critical_issues: criticalIssues,
+      important_recommendations: importantRecommendations,
+      minor_suggestions: minorSuggestions,
+      overall_assessment: `Analyzed ${fileCount} files with ${decision.toLowerCase()} recommendation.`,
+      decision,
+      reasoning
+    };
+
+    // Generate final report using LLM
+    const finalReportPrompt = PromptBuilder.buildSynthesisPrompt(
+      state.pr_details?.title || 'No title',
+      'Unknown author', // TODO: Get from PR details
+      fileCount,
+      Object.keys(state.chunk_analyses || {}).length,
+      analysisText
+    );
+
+    console.log(chalk.magenta(`🤖 Generating final report...`));
+
+    let finalReport = '';
+    try {
+      if (analysisService && analysisService['llmClient']) {
+        finalReport = await analysisService['llmClient'].generate(finalReportPrompt, {
+          onData: (chunk: string) => {
+            process.stdout.write(chalk.magenta(chunk));
+          },
+          onComplete: () => {
+            console.log(); // New line
+            console.log(chalk.green(`✅ Final report synthesis completed`));
+          },
+          onError: (error: Error) => {
+            console.error(chalk.red(`❌ Streaming error:`), error.message);
+          }
+        });
+      } else {
+        console.log(chalk.yellow(`⚠️  Analysis service not available, generating basic report`));
+        finalReport = `# PR Review Summary
+
+## Overall Assessment
+${synthesisData.decision}: ${synthesisData.reasoning}
+
+## Files Analyzed: ${fileCount}
+
+### Critical Issues (${criticalIssues.length})
+${criticalIssues.map(issue => `- ${issue}`).join('\n')}
+
+### Important Recommendations (${importantRecommendations.length})
+${importantRecommendations.map(rec => `- ${rec}`).join('\n')}
+
+### Minor Suggestions (${minorSuggestions.length})
+${minorSuggestions.map(sug => `- ${sug}`).join('\n')}
+
+## Detailed Analysis
+${analysisText}
+`;
+      }
+    } catch (error) {
+      console.error(chalk.red(`❌ Error generating final report: ${error}`));
+      finalReport = `# PR Review Summary (Error occurred during generation)
+
+## Overall Assessment
+${synthesisData.decision}: ${synthesisData.reasoning}
+
+## Files Analyzed: ${fileCount}
+${analysisText}
+`;
+    }
+
+    return {
+      synthesis_data: synthesisData,
+      final_report: finalReport
+    };
+  });
+
+  // Re-compile the workflow after updating the node
+  const compiledApp = workflow.compile({
+    checkpointer: undefined,
+  });
 
   return {
-    app,
+    app: compiledApp,
     config: {
       recursionLimit: 200, // Higher limit for complex workflows
       maxSteps: 2000,

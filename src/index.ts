@@ -14,9 +14,15 @@ import { resumeCommandHandler } from './commands/resume';
 import { listReportsHandler, viewReportHandler, viewFileAnalysesHandler, cleanReportsHandler } from './commands/reports';
 import { setupDatabaseConfig } from './config/databaseConfig';
 import { PrismaClient } from '@prisma/client';
+import { PluginService } from './services/pluginService';
+import * as path from 'path';
 
 // Setup database configuration before initializing Prisma
 setupDatabaseConfig();
+
+// Initialize and load plugins
+const pluginService = new PluginService(path.join(__dirname, 'plugins'));
+pluginService.loadPlugins();
 
 // Configuration for GitHub interaction method
 export type GitHubMethod = 'sdk' | 'cli';
@@ -52,7 +58,7 @@ addConfigOptions(reviewCommand)
   .action(async (options: { url: string; provider: string; server: string; model: string }) => {
     try {
       const { url, provider, server, model } = options;
-      const input = { url, prisma, provider, llmUrl: server, llmModel: model };
+      const input = { url, prisma, provider, llmUrl: server, llmModel: model, pluginService };
       await reviewCommandHandler(input);
     } catch (error) {
       console.error('Error during review process:', error);

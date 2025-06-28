@@ -147,6 +147,7 @@ For a deeper understanding of the project's inner workings, please refer to the 
 
 -   **[Software Architecture Document](./docs/ARCHITECTURE.md)**: A high-level overview of the system's components, layers, and the comprehensive review workflow.
 -   **[Data Flow Document](./docs/DATA_FLOW.md)**: A detailed explanation of how data moves through the system, from the initial user command to the final report generation.
+-   **[Plugin Architecture Document](./docs/PLUGIN_ARCHITECTURE.md)**: Describes the extensible plugin system, allowing custom analysis logic to be added without modifying core code.
 
 ## Contributing
 

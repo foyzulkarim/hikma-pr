@@ -79,10 +79,25 @@ class LLMClient {
    * Generate response using Ollama API
    */
   private async generateOllama(prompt: string, streamHandler?: StreamHandler): Promise<string> {
+    // Add constraints for concise responses
+    const enhancedPrompt = `${prompt}
+
+CONSTRAINTS:
+- Be concise and direct
+- Use bullet points, not paragraphs
+- Maximum 200 words total
+- Focus on actionable items only
+- No verbose explanations`;
+
     const requestData = {
       model: this.config.model,
-      prompt: prompt,
-      stream: !!streamHandler // Enable streaming if handler provided
+      prompt: enhancedPrompt,
+      stream: !!streamHandler, // Enable streaming if handler provided
+      options: {
+        temperature: 0.1, // Lower temperature for more focused responses
+        top_p: 0.9,
+        num_predict: 300, // Limit response length
+      }
     };
 
     try {
@@ -163,12 +178,22 @@ class LLMClient {
    * Generate response using LM Studio API (OpenAI-compatible)
    */
   private async generateLMStudio(prompt: string, streamHandler?: StreamHandler): Promise<string> {
+    // Add constraints for concise responses
+    const enhancedPrompt = `${prompt}
+
+CONSTRAINTS:
+- Be concise and direct
+- Use bullet points, not paragraphs  
+- Maximum 200 words total
+- Focus on actionable items only
+- No verbose explanations`;
+
     const requestData = {
       model: this.config.model,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content: enhancedPrompt }],
       stream: !!streamHandler,
-      temperature: 0.7,
-      max_tokens: -1 // LM Studio uses -1 for unlimited
+      temperature: 0.1, // Lower temperature for focused responses
+      max_tokens: 300 // Limit response length
     };
 
     const headers: Record<string, string> = {
@@ -245,10 +270,22 @@ class LLMClient {
    * Generate response using OpenAI API (for future use)
    */
   private async generateOpenAI(prompt: string, streamHandler?: StreamHandler): Promise<string> {
+    // Add constraints for concise responses
+    const enhancedPrompt = `${prompt}
+
+CONSTRAINTS:
+- Be concise and direct
+- Use bullet points, not paragraphs
+- Maximum 200 words total  
+- Focus on actionable items only
+- No verbose explanations`;
+
     const requestData = {
       model: this.config.model,
-      messages: [{ role: 'user', content: prompt }],
-      stream: !!streamHandler
+      messages: [{ role: 'user', content: enhancedPrompt }],
+      stream: !!streamHandler,
+      temperature: 0.1, // Lower temperature for focused responses
+      max_tokens: 300 // Limit response length
     };
 
     const headers: Record<string, string> = {

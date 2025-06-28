@@ -15,14 +15,14 @@ import os from 'os';
 /**
  * Generates a comprehensive markdown report from the review state
  */
-const generateMarkdownReport = (state: any, taskId: string, prUrl: string, analysisMetadata?: {
+const generateMarkdownReport = async (state: any, taskId: string, prUrl: string, prisma: PrismaClient, analysisMetadata?: {
   startTime: Date;
   endTime: Date;
   modelInfo: {
     providerUrl: string;
     modelName: string;
   };
-}, reviewRecord?: any): string => {
+}, reviewRecord?: any): Promise<string> => {
   const timestamp = new Date().toISOString();
   const prDetails = state.pr_details || {};
 
@@ -165,6 +165,91 @@ ${prDetails.body || '*No description provided*'}
         markdown += `\n`;
       }
 
+      // Add plugin findings from database
+      try {
+        const pluginFindings = await prisma.pluginFinding.findMany({
+          where: {
+            reviewId: taskId,
+            // Get findings for chunks related to this file
+            chunk: {
+              filePath: fileName
+            }
+          },
+          orderBy: [
+            { line: 'asc' },
+            { severity: 'desc' }
+          ]
+        });
+
+        if (pluginFindings.length > 0) {
+          // Count findings by severity
+          const severityCounts = pluginFindings.reduce((acc, finding) => {
+            acc[finding.severity] = (acc[finding.severity] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>);
+
+          const errorCount = severityCounts.error || 0;
+          const warningCount = severityCounts.warning || 0;
+          const infoCount = severityCounts.info || 0;
+
+          markdown += `\n### 🔌 Plugin Analysis Results\n\n`;
+          
+          // Summary with badges
+          let summaryBadges = [];
+          if (errorCount > 0) summaryBadges.push(`🚨 ${errorCount} error${errorCount > 1 ? 's' : ''}`);
+          if (warningCount > 0) summaryBadges.push(`⚠️ ${warningCount} warning${warningCount > 1 ? 's' : ''}`);
+          if (infoCount > 0) summaryBadges.push(`ℹ️ ${infoCount} info`);
+          
+          markdown += `**Summary:** ${summaryBadges.join(' • ')}\n\n`;
+          
+          // Group findings by plugin for better organization
+          const findingsByPlugin = pluginFindings.reduce((acc: Record<string, typeof pluginFindings>, finding) => {
+            if (!acc[finding.pluginName]) acc[finding.pluginName] = [];
+            acc[finding.pluginName].push(finding);
+            return acc;
+          }, {});
+
+          // Sort plugins by severity (plugins with errors first)
+          const sortedPlugins = Object.entries(findingsByPlugin).sort(([, findingsA], [, findingsB]) => {
+            const maxSeverityA = Math.min(...findingsA.map(f => ['error', 'warning', 'info'].indexOf(f.severity)));
+            const maxSeverityB = Math.min(...findingsB.map(f => ['error', 'warning', 'info'].indexOf(f.severity)));
+            return maxSeverityA - maxSeverityB;
+          });
+
+          for (const [pluginName, findings] of sortedPlugins) {
+            const pluginIcon = pluginName.includes('Security') ? '🔒' :
+                             pluginName.includes('React') ? '⚛️' :
+                             pluginName.includes('TypeScript') ? '📘' :
+                             pluginName.includes('Code Smell') ? '🔍' : '🔌';
+            
+            markdown += `#### ${pluginIcon} ${pluginName}\n\n`;
+            
+            // Sort findings by severity, then by line number
+            const sortedFindings = findings.sort((a, b) => {
+              const severityOrder = ['error', 'warning', 'info'];
+              const severityDiff = severityOrder.indexOf(a.severity) - severityOrder.indexOf(b.severity);
+              if (severityDiff !== 0) return severityDiff;
+              return (a.line || 0) - (b.line || 0);
+            });
+
+            sortedFindings.forEach((finding, index) => {
+              const severityIcon = finding.severity === 'error' ? '🚨' : 
+                                 finding.severity === 'warning' ? '⚠️' : 'ℹ️';
+              
+              markdown += `${index + 1}. ${severityIcon} **${finding.message}**`;
+              if (finding.line) {
+                markdown += ` *(Line ${finding.line})*`;
+              }
+              markdown += `\n\n`;
+            });
+          }
+          
+          markdown += `---\n\n`;
+        }
+      } catch (error) {
+        console.error(chalk.yellow(`⚠️  Could not fetch plugin findings: ${error}`));
+      }
+
       markdown += `---\n\n`;
     }
   } else {
@@ -225,11 +310,14 @@ const saveMarkdownReport = (markdown: string, prUrl: string, taskId: string): st
   return filepath;
 };
 
-export const reviewCommandHandler = async (input: { url: string, prisma: PrismaClient, provider: string, llmUrl: string, llmModel: string }) => {
+import { PluginService } from '../services/pluginService';
+
+export const reviewCommandHandler = async (input: { url: string, prisma: PrismaClient, provider: string, llmUrl: string, llmModel: string, pluginService: PluginService }) => {
   const taskId = uuidv4();
   const startTime = new Date(); // Track start time
-  const { url: prUrl, prisma, provider, llmUrl, llmModel } = input;
-  console.log(chalk.bold.cyan(`\n🚀 Starting Hikmapr Multi-Pass Analysis`));
+  const { url: prUrl, prisma, provider, llmUrl, llmModel, pluginService } = input;
+  console.log(chalk.bold.cyan(`
+🚀 Starting Hikmapr Multi-Pass Analysis`));
   console.log(chalk.blue(`📝 Task ID: ${chalk.yellow(taskId)}`));
   console.log(chalk.blue(`🔗 PR URL: ${chalk.yellow(prUrl)}`));
   console.log(chalk.blue(`🔬 Using Advanced Multi-Pass Analysis Architecture`));
@@ -245,6 +333,7 @@ export const reviewCommandHandler = async (input: { url: string, prisma: PrismaC
   // Use the advanced multi-pass analysis workflow
   const { app, config: workflowConfig } = getAppWithConfig({
     modelInfo,
+    pluginService, // Pass the pluginService here
   });
 
 
@@ -520,7 +609,7 @@ export const reviewCommandHandler = async (input: { url: string, prisma: PrismaC
       console.log(chalk.yellow(`⚠️  Could not fetch review record for timing info`));
     }
 
-    const markdown = generateMarkdownReport(lastState, taskId, prUrl, analysisMetadata, reviewRecord);
+    const markdown = await generateMarkdownReport(lastState, taskId, prUrl, prisma, analysisMetadata, reviewRecord);
     const reportPath = saveMarkdownReport(markdown, prUrl, taskId);
     console.log(chalk.green(`✅ Report saved to: ${chalk.yellow(reportPath)}`));
   } catch (error) {
