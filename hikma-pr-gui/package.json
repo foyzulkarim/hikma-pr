@@ -1,6 +1,6 @@
 {
   "name": "hikma-pr-gui",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.10.1",
+    "dotenv": "^17.0.0",
     "next": "15.3.4",
     "parse-diff": "^0.11.1",
     "prisma": "^6.10.1",

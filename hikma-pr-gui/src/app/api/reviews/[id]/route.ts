@@ -19,10 +19,20 @@ export async function GET(
               orderBy: {
                 passType: 'asc'
               }
+            },
+            pluginFindings: {
+              orderBy: {
+                severity: 'desc'
+              }
             }
           },
           orderBy: {
             filePath: 'asc'
+          }
+        },
+        pluginFindings: {
+          orderBy: {
+            severity: 'desc'
           }
         }
       }

@@ -1,0 +1,31 @@
+# Development files
+src/
+tests/
+*.test.ts
+*.test.js
+.env
+.env.local
+.env.example
+
+# Build artifacts
+tsconfig.json
+jest.config.js
+
+# GUI build artifacts and dependencies
+hikma-pr-gui/node_modules/
+hikma-pr-gui/.next/
+hikma-pr-gui/.env.local
+hikma-pr-gui/next-env.d.ts
+
+# Git and IDE
+.git/
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary files
+temp/
+reports/

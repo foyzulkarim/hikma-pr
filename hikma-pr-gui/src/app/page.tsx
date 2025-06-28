@@ -31,6 +31,7 @@ interface Review {
   _count?: {
     chunkAnalyses: number
     analysisPasses: number
+    pluginFindings: number
   }
   chunkAnalyses?: Array<{
     id: string
@@ -240,6 +241,9 @@ export default function Home() {
                             <>
                               <span>🧩 {review._count.chunkAnalyses} chunks</span>
                               <span>🔬 {review._count.analysisPasses} passes</span>
+                              {review._count.pluginFindings > 0 && (
+                                <span>🔌 {review._count.pluginFindings} plugin findings</span>
+                              )}
                             </>
                           )}
                         </div>

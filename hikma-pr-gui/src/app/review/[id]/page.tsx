@@ -176,6 +176,16 @@ interface AnalysisPass {
   createdAt: string
 }
 
+interface PluginFinding {
+  id: string
+  pluginId: string
+  pluginName: string
+  message: string
+  severity: string
+  line?: number
+  createdAt: string
+}
+
 interface ChunkAnalysis {
   id: string
   chunkId: string
@@ -188,6 +198,7 @@ interface ChunkAnalysis {
   contextBefore?: string
   contextAfter?: string
   analysisPasses: AnalysisPass[]
+  pluginFindings: PluginFinding[]
 }
 
 interface Review {
@@ -227,6 +238,7 @@ interface Review {
   completedAt?: string
   
   chunkAnalyses: ChunkAnalysis[]
+  pluginFindings: PluginFinding[]
   fileAnalyses?: Array<{
     fileName: string
     analysis: string
@@ -349,6 +361,20 @@ export default function ReviewDetail() {
     return grouped
   }
 
+  const getSeverityBadge = (severity: string) => {
+    const baseClasses = "px-2 py-1 rounded text-xs font-medium"
+    switch (severity.toLowerCase()) {
+      case 'error':
+        return `${baseClasses} bg-red-100 text-red-800`
+      case 'warning':
+        return `${baseClasses} bg-yellow-100 text-yellow-800`
+      case 'info':
+        return `${baseClasses} bg-blue-100 text-blue-800`
+      default:
+        return `${baseClasses} bg-gray-100 text-gray-800`
+    }
+  }
+
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase()
     switch (ext) {
@@ -458,7 +484,7 @@ export default function ReviewDetail() {
 
             {/* Progress */}
             {review.state.progress && (
-              <div className="grid grid-cols-4 gap-4 bg-gray-50 rounded p-4">
+              <div className="grid grid-cols-5 gap-4 bg-gray-50 rounded p-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-600">
                     {review.state.progress.completed_files}/{review.state.progress.total_files}
@@ -476,6 +502,12 @@ export default function ReviewDetail() {
                     {review.state.progress.completed_passes}/{review.state.progress.total_passes}
                   </div>
                   <div className="text-sm text-gray-600">Analysis Passes</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600">
+                    {review.pluginFindings?.length || 0}
+                  </div>
+                  <div className="text-sm text-gray-600">Plugin Findings</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-gray-700">
@@ -581,6 +613,57 @@ export default function ReviewDetail() {
           </div>
         )}
 
+        {/* Plugin Findings Summary */}
+        {review.pluginFindings && review.pluginFindings.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">🔌 Plugin Findings Summary</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {['error', 'warning', 'info'].map(severity => {
+                const findings = review.pluginFindings.filter(f => f.severity.toLowerCase() === severity)
+                if (findings.length === 0) return null
+                
+                return (
+                  <div key={severity} className="text-center">
+                    <div className={`text-2xl font-bold ${
+                      severity === 'error' ? 'text-red-600' : 
+                      severity === 'warning' ? 'text-yellow-600' : 'text-blue-600'
+                    }`}>
+                      {findings.length}
+                    </div>
+                    <div className="text-sm text-gray-600 capitalize">{severity}s</div>
+                  </div>
+                )
+              })}
+            </div>
+            
+            <div className="space-y-3">
+              {review.pluginFindings
+                .sort((a, b) => {
+                  const severityOrder = { error: 3, warning: 2, info: 1 }
+                  return severityOrder[b.severity.toLowerCase()] - severityOrder[a.severity.toLowerCase()]
+                })
+                .map(finding => (
+                <div key={finding.id} className="border border-gray-200 rounded p-4 bg-gray-50">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-900">{finding.pluginName}</span>
+                      <span className={getSeverityBadge(finding.severity)}>
+                        {finding.severity.toUpperCase()}
+                      </span>
+                      {finding.line && (
+                        <span className="text-xs text-gray-500">Line {finding.line}</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-400 font-mono">{finding.pluginId}</span>
+                  </div>
+                  <p className="text-gray-700 text-sm">{finding.message}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Filter Controls */}
         <div className="bg-white rounded-lg shadow p-4 mb-6">
           <div className="flex items-center gap-2">
@@ -658,31 +741,60 @@ export default function ReviewDetail() {
                           <SideBySideDiff diffContent={chunk.diffContent} />
                         </div>
 
-                        {/* BOTTOM: Analysis Passes */}
-                        <div>
-                          <h5 className="text-base font-medium text-gray-900 mb-3">🔬 Analysis Passes</h5>
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            {chunk.analysisPasses
-                              .filter(pass => selectedPassType === 'all' || pass.passType === selectedPassType)
-                              .map(pass => (
-                              <div key={pass.id} className="border border-gray-200 rounded p-4 bg-gray-50 h-full">
-                                <div className="flex items-center justify-between mb-4">
-                                  <h5 className="text-base font-medium text-gray-900">
-                                    {getPassTypeIcon(pass.passType)} {getPassTypeName(pass.passType)}
-                                  </h5>
-                                  <div className="flex items-center gap-2">
-                                    <span className={getRiskBadge(pass.riskLevel)}>
-                                      {pass.riskLevel}
-                                    </span>
-                                    <span className="text-xs text-gray-500">
-                                      {pass.tokensUsed} tokens • {(pass.durationMs / 1000).toFixed(1)}s
-                                    </span>
+                        {/* BOTTOM: Analysis Passes and Plugin Findings */}
+                        <div className="space-y-6">
+                          {/* Analysis Passes */}
+                          <div>
+                            <h5 className="text-base font-medium text-gray-900 mb-3">🔬 Analysis Passes</h5>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                              {chunk.analysisPasses
+                                .filter(pass => selectedPassType === 'all' || pass.passType === selectedPassType)
+                                .map(pass => (
+                                <div key={pass.id} className="border border-gray-200 rounded p-4 bg-gray-50 h-full">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h5 className="text-base font-medium text-gray-900">
+                                      {getPassTypeIcon(pass.passType)} {getPassTypeName(pass.passType)}
+                                    </h5>
+                                    <div className="flex items-center gap-2">
+                                      <span className={getRiskBadge(pass.riskLevel)}>
+                                        {pass.riskLevel}
+                                      </span>
+                                      <span className="text-xs text-gray-500">
+                                        {pass.tokensUsed} tokens • {(pass.durationMs / 1000).toFixed(1)}s
+                                      </span>
+                                    </div>
                                   </div>
+                                  <MarkdownRenderer content={pass.analysisResult} />
                                 </div>
-                                <MarkdownRenderer content={pass.analysisResult} />
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
+
+                          {/* Plugin Findings */}
+                          {chunk.pluginFindings && chunk.pluginFindings.length > 0 && (
+                            <div>
+                              <h5 className="text-base font-medium text-gray-900 mb-3">🔌 Plugin Findings</h5>
+                              <div className="space-y-3">
+                                {chunk.pluginFindings.map(finding => (
+                                  <div key={finding.id} className="border border-gray-200 rounded p-4 bg-white">
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium text-gray-900">{finding.pluginName}</span>
+                                        <span className={getSeverityBadge(finding.severity)}>
+                                          {finding.severity.toUpperCase()}
+                                        </span>
+                                        {finding.line && (
+                                          <span className="text-xs text-gray-500">Line {finding.line}</span>
+                                        )}
+                                      </div>
+                                      <span className="text-xs text-gray-400 font-mono">{finding.pluginId}</span>
+                                    </div>
+                                    <p className="text-gray-700 text-sm">{finding.message}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}

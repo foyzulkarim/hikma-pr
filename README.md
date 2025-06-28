@@ -17,6 +17,31 @@ The system is architected to be modular, extensible, and resilient. It uses a gr
 
 ## Getting Started
 
+### Quick Start with npx (Recommended)
+
+The easiest way to get started is using npx, which automatically handles installation and setup:
+
+```bash
+npx hikma-pr review --server "http://localhost:1234" --model "your-model-name" --url "https://github.com/owner/repo/pull/123"
+```
+
+**First-time setup**: The first time you run the command, it will automatically:
+- Install the package
+- Set up the database in `~/.hikmapr/reviews.db`
+- Generate the necessary Prisma client
+
+**View results in web interface:**
+```bash
+npx hikma-pr ui
+```
+
+If you encounter any setup issues, you can manually initialize:
+```bash
+npx hikma-pr init
+```
+
+### Manual Installation (For Development)
+
 ### Prerequisites
 
 Before you begin, ensure you have the following installed:
@@ -140,6 +165,39 @@ hikma-pr reports view 1
 # Or view by filename/taskId
 hikma-pr reports view <report_filename_or_task_id>
 ```
+
+### Web Interface
+
+Hikma-PR includes a modern web interface to visualize your review results in a user-friendly format.
+
+**Start the web UI server:**
+```bash
+# Start on default port (3000)
+npx hikma-pr ui
+
+# Or use the explicit start command
+npx hikma-pr ui start
+
+# Start on a custom port
+npx hikma-pr ui start --port 8080
+
+# Start without automatically opening browser
+npx hikma-pr ui start --no-open
+```
+
+The web interface provides:
+- 📊 **Review Dashboard**: Overview of all your PR reviews
+- 🔍 **Detailed Analysis View**: In-depth view of each review with syntax highlighting
+- 🔌 **Plugin Findings**: Visual display of plugin-detected issues
+- 📈 **Progress Tracking**: Real-time progress of ongoing reviews
+- 🎯 **Risk Assessment**: Color-coded risk levels and severity indicators
+
+**Build the UI for production:**
+```bash
+npx hikma-pr ui build
+```
+
+> **Note**: The first time you run the UI command, it will automatically install the necessary dependencies. This may take a moment.
 
 ## Project Documentation
 
