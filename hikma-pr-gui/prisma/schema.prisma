@@ -25,9 +25,10 @@ model Review {
   completedAt   DateTime? // When analysis completed
   
   // Relationships
-  fileAnalyses   FileAnalysis[]
-  chunkAnalyses  ChunkAnalysis[]
-  analysisPasses AnalysisPass[]
+  fileAnalyses       FileAnalysis[]
+  chunkAnalyses      ChunkAnalysis[]
+  analysisPasses     AnalysisPass[]
+  pluginFindings     PluginFinding[]
 }
 
 model FileAnalysis {
@@ -63,6 +64,7 @@ model ChunkAnalysis {
   // Relationships
   review         Review        @relation(fields: [reviewId], references: [id], onDelete: Cascade)
   analysisPasses AnalysisPass[]
+  pluginFindings PluginFinding[]
 }
 
 model AnalysisPass {
@@ -84,3 +86,21 @@ model AnalysisPass {
   
   @@unique([chunkId, passType]) // Ensure one pass of each type per chunk
 }
+
+model PluginFinding {
+  id          String   @id @default(cuid())
+  reviewId    String
+  chunkId     String
+  pluginId    String   // Plugin identifier
+  pluginName  String   // Human-readable plugin name
+  message     String   // Finding message
+  severity    String   // info, warning, error
+  line        Int?     // Optional line number
+  createdAt   DateTime @default(now())
+  
+  // Relationships
+  review      Review        @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  chunk       ChunkAnalysis @relation(fields: [chunkId], references: [chunkId], onDelete: Cascade)
+}
+
+

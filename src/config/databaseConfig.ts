@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
+import { execSync } from 'child_process';
 
 const DATABASE_DIR = '.hikmapr';
 const DATABASE_FILE = 'reviews.db';
@@ -23,6 +24,46 @@ export function setupDatabaseConfig(): void {
     
     // Set the DATABASE_URL environment variable
     process.env.DATABASE_URL = `file:${dbPath}`;
+  }
+}
+
+/**
+ * Ensure Prisma client is generated and database is set up
+ */
+export async function ensureDatabaseSetup(): Promise<void> {
+  try {
+    // Try to import Prisma client to see if it's generated
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    // Try a simple query to check if database is accessible
+    await prisma.$queryRaw`SELECT 1`;
+    await prisma.$disconnect();
+  } catch (error) {
+    console.log('🔧 Setting up database for first-time use...');
+    
+    try {
+      // Generate Prisma client
+      console.log('⚙️  Generating Prisma client...');
+      execSync('npx prisma generate', { 
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: process.env
+      });
+
+      // Deploy migrations
+      console.log('🚀 Setting up database schema...');
+      execSync('npx prisma migrate deploy', { 
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: process.env
+      });
+
+      console.log('✅ Database setup complete!');
+    } catch (setupError) {
+      const errorMessage = setupError instanceof Error ? setupError.message : String(setupError);
+      console.error('❌ Failed to set up database:', errorMessage);
+      console.log('💡 Please try running: npx prisma generate && npx prisma migrate deploy');
+      throw setupError;
+    }
   }
 }
 

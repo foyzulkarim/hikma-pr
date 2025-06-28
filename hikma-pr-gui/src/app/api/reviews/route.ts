@@ -12,9 +12,11 @@ export async function GET() {
         fileAnalyses: true,
         chunkAnalyses: {
           include: {
-            analysisPasses: true
+            analysisPasses: true,
+            pluginFindings: true
           }
-        }
+        },
+        pluginFindings: true
       }
     })
     
@@ -23,7 +25,8 @@ export async function GET() {
       ...review,
       _count: {
         chunkAnalyses: review.chunkAnalyses?.length || 0,
-        analysisPasses: review.analysisPasses?.length || 0
+        analysisPasses: review.analysisPasses?.length || 0,
+        pluginFindings: review.pluginFindings?.length || 0
       }
     }))
     

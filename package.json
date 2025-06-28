@@ -1,6 +1,6 @@
 {
   "name": "hikma-pr",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -13,6 +13,8 @@
     "build": "prisma generate && tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
+    "postinstall": "node scripts/setup.js",
+    "prepare": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -31,6 +33,14 @@
   "bin": {
     "hikma-pr": "./dist/index.js"
   },
+  "files": [
+    "dist/",
+    "prisma/",
+    "scripts/",
+    "hikma-pr-gui/",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [],
   "author": "",
   "license": "ISC",
