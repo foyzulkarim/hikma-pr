@@ -113,7 +113,7 @@ export async function startUIServer(options: { port?: number; open?: boolean } =
   console.log('');
   
   // Start the Next.js development server
-  const devProcess = spawn('npm', ['run', 'dev'], {
+  const devProcess = spawn('npm', ['exec', '--', 'next', 'dev'], {
     cwd: guiPath,
     stdio: 'inherit',
     env
