@@ -3,50 +3,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
-interface Review {
-  id: string
-  prUrl: string
-  state: {
-    pr_details?: {
-      title: string
-      body: string
-    }
-    progress?: {
-      total_files: number
-      completed_files: number
-      total_chunks: number
-      completed_chunks: number
-      total_passes: number
-      completed_passes: number
-    }
-    synthesis_data?: {
-      decision: 'APPROVE' | 'REQUEST_CHANGES' | 'REJECT'
-      overall_assessment: string
-    }
-    final_report?: string
-  }
-  error?: string | null
-  createdAt: string
-  updatedAt: string
-  _count?: {
-    chunkAnalyses: number
-    analysisPasses: number
-    pluginFindings: number
-  }
-  chunkAnalyses?: Array<{
-    id: string
-    filePath: string
-    analysisPasses: Array<{
-      passType: string
-      riskLevel: string
-    }>
-  }>
-}
-
 export default function Home() {
-  const [reviews, setReviews] = useState<Review[]>([])
+  const [reviews, setReviews] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     fetchReviews()
@@ -67,11 +27,11 @@ export default function Home() {
     }
   }
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString) => {
     return new Date(dateString).toLocaleString()
   }
 
-  const extractPRInfo = (prUrl: string) => {
+  const extractPRInfo = (prUrl) => {
     const match = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/)
     if (match) {
       return {
@@ -83,7 +43,7 @@ export default function Home() {
     return null
   }
 
-  const getDecisionBadge = (decision?: string) => {
+  const getDecisionBadge = (decision) => {
     const baseClasses = "px-2 py-1 rounded text-sm font-medium"
     switch (decision) {
       case 'APPROVE':
@@ -97,7 +57,7 @@ export default function Home() {
     }
   }
 
-  const getHighestRiskLevel = (chunkAnalyses?: Review['chunkAnalyses']) => {
+  const getHighestRiskLevel = (chunkAnalyses) => {
     if (!chunkAnalyses || chunkAnalyses.length === 0) return 'UNKNOWN'
     
     const riskLevels = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
@@ -116,7 +76,7 @@ export default function Home() {
     return highestRisk
   }
 
-  const getRiskBadge = (riskLevel: string) => {
+  const getRiskBadge = (riskLevel) => {
     const baseClasses = "px-2 py-1 rounded text-sm font-medium"
     switch (riskLevel) {
       case 'LOW':
@@ -132,7 +92,7 @@ export default function Home() {
     }
   }
 
-  const getProgressPercentage = (progress?: Review['state']['progress']) => {
+  const getProgressPercentage = (progress) => {
     if (!progress) return 0
     if (progress.total_passes === 0) return 0
     return Math.round((progress.completed_passes / progress.total_passes) * 100)

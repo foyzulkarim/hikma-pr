@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request, { params }) {
   const { id } = await params
   try {
     const review = await prisma.review.findUnique({
@@ -53,4 +50,4 @@ export async function GET(
       { status: 500 }
     )
   }
-} 
+}

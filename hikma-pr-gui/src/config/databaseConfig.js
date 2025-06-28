@@ -6,7 +6,7 @@ import * as fs from 'fs';
  * Database Configuration for GUI
  * Sets up the DATABASE_URL environment variable to use the user's home directory
  */
-export function setupDatabaseConfig(): void {
+export function setupDatabaseConfig() {
   // Only set DATABASE_URL if it's not already configured
   if (!process.env.DATABASE_URL) {
     const homeDir = os.homedir();
@@ -26,7 +26,7 @@ export function setupDatabaseConfig(): void {
 /**
  * Get the database directory path
  */
-export function getDatabaseDir(): string {
+export function getDatabaseDir() {
   const homeDir = os.homedir();
   return path.join(homeDir, '.hikmapr');
 }
@@ -34,7 +34,7 @@ export function getDatabaseDir(): string {
 /**
  * Get the full database file path
  */
-export function getDatabasePath(): string {
+export function getDatabasePath() {
   const homeDir = os.homedir();
   return path.join(homeDir, '.hikmapr', 'reviews.db');
 }
