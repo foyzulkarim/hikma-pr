@@ -7,14 +7,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ArrowLeft, ExternalLink, FileText, AlertTriangle, CheckCircle, TrendingUp, ChevronDown, ChevronRight, Plus, Minus } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
-import { mockReviews } from "@/data/mockData";
 import QualityScoreDisplay from "@/components/QualityScoreDisplay";
 import FindingCard from "@/components/FindingCard";
 import QualityRadarChart from "@/components/QualityRadarChart";
+import { useReviews } from "@/hooks/useReviews";
 
 const ReviewDetail = () => {
   const { id } = useParams();
-  const review = mockReviews.find(r => r.id === id);
+  const { reviews, loading } = useReviews();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading review details...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  const review = reviews.find(r => r.id === id);
   
   if (!review) {
     return (
