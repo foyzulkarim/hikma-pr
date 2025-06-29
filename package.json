@@ -17,6 +17,7 @@
     "prepare": "prisma generate",
     "build-ui": "node scripts/build-ui.js",
     "serve-ui": "node scripts/serve-ui.js",
+    "serve-api": "node scripts/serve-ui.js --skip-build",
     "ui": "npm run build-ui && npm run serve-ui",
     "export-data": "node scripts/export-data.js",
     "db:generate": "prisma generate",

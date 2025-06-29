@@ -29,19 +29,6 @@ const Index = () => {
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
-        <div className="text-center">
-          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <p className="text-red-600 mb-2">Error loading data</p>
-          <p className="text-slate-600 text-sm">{error}</p>
-          <p className="text-slate-500 text-xs mt-2">Showing mock data as fallback</p>
-        </div>
-      </div>
-    );
-  }
-
   const filteredReviews = reviews.filter(review => {
     const matchesSearch = review.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          review.repository.toLowerCase().includes(searchTerm.toLowerCase());
@@ -70,7 +57,7 @@ const Index = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-slate-900">{summaryStats.totalReviews}</div>
-              <p className="text-xs text-green-600 mt-1">+12% from last month</p>
+              {/* <p className="text-xs text-green-600 mt-1">+12% from last month</p> */}
             </CardContent>
           </Card>
 
@@ -81,7 +68,7 @@ const Index = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-slate-900">{summaryStats.criticalFindings}</div>
-              <p className="text-xs text-red-600 mt-1">-8% from last week</p>
+              {/* <p className="text-xs text-red-600 mt-1">-8% from last week</p> */}
             </CardContent>
           </Card>
 
@@ -92,7 +79,7 @@ const Index = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-slate-900">{summaryStats.avgQualityScore}</div>
-              <p className="text-xs text-green-600 mt-1">+5% from last month</p>
+              {/* <p className="text-xs text-green-600 mt-1">+5% from last month</p> */}
             </CardContent>
           </Card>
 
@@ -103,7 +90,7 @@ const Index = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-slate-900">{summaryStats.activeRepos}</div>
-              <p className="text-xs text-slate-500 mt-1">Last 30 days</p>
+              {/* <p className="text-xs text-slate-500 mt-1">Last 30 days</p> */}
             </CardContent>
           </Card>
         </div>

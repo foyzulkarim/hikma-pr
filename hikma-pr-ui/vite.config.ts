@@ -7,7 +7,15 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    port: 5173, // Use standard Vite port
+    proxy: {
+      // Proxy API calls to the Express server
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   },
   plugins: [
     react(),

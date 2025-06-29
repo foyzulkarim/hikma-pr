@@ -17,31 +17,31 @@ export function useReviews(): UseReviewsReturn {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Development: use mock data (Vite dev server runs on port 5173)
-        if (window.location.hostname === 'localhost' && window.location.port === '5173') {
-          console.log('🔧 Development mode: Using mock data');
-          setReviews(mockReviews);
-          setSummaryStats(mockSummaryStats);
-          setLoading(false);
-          return;
-        }
-
-        // Production (npx): fetch real data
-        console.log('🚀 Production mode: Fetching real data');
+        console.log('🔄 Fetching data from API...');
         const response = await fetch('/api/reviews');
         
         if (!response.ok) {
-          throw new Error(`Failed to fetch reviews: ${response.statusText}`);
+          throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        }
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error('API returned non-JSON response');
         }
         
         const data = await response.json();
         setReviews(data.reviews || []);
         setSummaryStats(data.summaryStats || mockSummaryStats);
         setLoading(false);
+        
+        console.log(`✅ Loaded ${data.reviews?.length || 0} reviews from API`);
+        
       } catch (err) {
-        console.error('Error loading reviews:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load reviews');
-        // Fallback to mock data on error
+        console.error('❌ Failed to load data from API:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load data');
+        
+        // Fallback to mock data only as last resort
+        console.log('📝 Falling back to mock data');
         setReviews(mockReviews);
         setSummaryStats(mockSummaryStats);
         setLoading(false);

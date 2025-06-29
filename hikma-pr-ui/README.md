@@ -1,73 +1,64 @@
-# Welcome to your Lovable project
+# Hikma PR UI
 
-## Project info
+Beautiful React dashboard for viewing PR analysis results from Hikma PR.
 
-**URL**: https://lovable.dev/projects/463dc10c-34b5-41df-bcba-ba576f37b31d
+## 🚀 Development Workflow
 
-## How can I edit this code?
+### Step 1: Start the API Server
+```bash
+# From the main project directory
+cd ..
+npm run serve-ui
+```
+This starts the Express server with real data on `http://localhost:3000`
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/463dc10c-34b5-41df-bcba-ba576f37b31d) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### Step 2: Start the UI Development Server
+```bash
+# From the UI directory
 npm run dev
 ```
+This starts the Vite dev server on `http://localhost:5173` with:
+- ✅ **Real data** from your SQLite database (proxied from API server)
+- ✅ **Hot reload** for instant UI changes
+- ✅ **Same data** as production build
+- ✅ **No mock data management** needed
 
-**Edit a file directly in GitHub**
+## 🔄 How It Works
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```
+┌─────────────────┐    API Proxy    ┌──────────────────┐
+│  Vite Dev       │ ──────────────► │  Express Server  │
+│  localhost:5173 │                 │  localhost:3000  │
+│                 │                 │                  │
+│  React UI       │                 │  Real Data API   │
+│  Hot Reload     │                 │  SQLite → JSON   │
+└─────────────────┘                 └──────────────────┘
+```
 
-**Use GitHub Codespaces**
+- **UI Dev Server (5173)**: Hot reload, fast development
+- **API Server (3000)**: Real data from your database
+- **Vite Proxy**: Automatically forwards `/api/*` calls to port 3000
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 📊 Data Flow
 
-## What technologies are used for this project?
+1. **UI makes request**: `fetch('/api/reviews')`
+2. **Vite proxy forwards**: `http://localhost:3000/api/reviews`
+3. **Express server responds**: Real data from SQLite
+4. **UI receives**: Same JSON as production
 
-This project is built with:
+## 🔧 Available Scripts
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- `npm run dev` - Start development server (requires API server running)
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
 
-## How can I deploy this project?
+## 💡 Benefits
 
-Simply open [Lovable](https://lovable.dev/projects/463dc10c-34b5-41df-bcba-ba576f37b31d) and click on Share -> Publish.
+- ✅ **Perfect dev/prod parity**: Same data, same behavior
+- ✅ **Real-time development**: Hot reload with real data
+- ✅ **No mock data complexity**: Single source of truth
+- ✅ **Easy testing**: Test with your actual PR analyses
 
-## Can I connect a custom domain to my Lovable project?
+## 🚨 Important
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+Always start the API server first (`npm run serve-ui` from main project), then start the UI dev server. The UI will proxy API calls to the running Express server.

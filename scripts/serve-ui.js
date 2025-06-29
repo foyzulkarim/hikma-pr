@@ -14,18 +14,20 @@ function getDatabasePath() {
 }
 
 async function startUI(options = {}) {
-  const { port = 3000, dbPath, skipDataGeneration = false } = options;
+  const { port = 3000, dbPath, skipDataGeneration = false, skipBuild = false } = options;
   
   // Use the correct database path if not provided
   const actualDbPath = dbPath || getDatabasePath();
   
   console.log('🚀 Starting PR Analysis UI...');
   
-  // Check if UI build exists
-  const uiPath = path.join(__dirname, '../dist/ui');
-  if (!fs.existsSync(uiPath)) {
-    console.error('❌ UI build not found. Please run: npm run build-ui');
-    process.exit(1);
+  // Check if UI build exists (unless we're skipping build check for API-only mode)
+  if (!skipBuild) {
+    const uiPath = path.join(__dirname, '../dist/ui');
+    if (!fs.existsSync(uiPath)) {
+      console.error('❌ UI build not found. Please run: npm run build-ui');
+      process.exit(1);
+    }
   }
   
   let reviewsData = { reviews: [], summaryStats: { totalReviews: 0, criticalFindings: 0, avgQualityScore: 0, activeRepos: 0 } };
@@ -44,8 +46,11 @@ async function startUI(options = {}) {
   // Create Express app
   const app = express();
   
-  // Serve static files from UI build
-  app.use(express.static(uiPath));
+  // Serve static files from UI build (only if not in API-only mode)
+  if (!skipBuild) {
+    const uiPath = path.join(__dirname, '../dist/ui');
+    app.use(express.static(uiPath));
+  }
   
   // API endpoint for reviews data
   app.get('/api/reviews', (req, res) => {
@@ -62,9 +67,13 @@ async function startUI(options = {}) {
   });
   
   // Catch-all handler: send back React app's index.html file for client-side routing
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(uiPath, 'index.html'));
-  });
+  // (only if not in API-only mode)
+  if (!skipBuild) {
+    const uiPath = path.join(__dirname, '../dist/ui');
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(uiPath, 'index.html'));
+    });
+  }
   
   // Start server
   const server = app.listen(port, () => {
@@ -105,6 +114,9 @@ if (require.main === module) {
         break;
       case '--skip-data':
         options.skipDataGeneration = true;
+        break;
+      case '--skip-build':
+        options.skipBuild = true;
         break;
     }
   }
