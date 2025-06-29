@@ -1,0 +1,73 @@
+name: Publish to npmjs
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to push version changes
+      id-token: write # Required for OIDC token
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }} # Allows pushing to the repo
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Specify your Node.js version
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "${{ github.actor }}"
+          git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - name: Increment minor version
+        run: npm version minor --force --git-tag-version=false
+
+      - name: Build project
+        run: npm run build
+
+      - name: Publish to npmjs
+        run: npm publish --access public # Add --access public if it's a public package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Commit and push version changes
+        run: |
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to $(node -p "require('./package.json').version")"
+          git push
+
+# Placeholder for NPM_TOKEN secret
+# You need to create a secret in your GitHub repository settings named NPM_TOKEN with your npm access token.
+
+# Placeholder for Node.js version
+# The Node.js version is set to '20'. You can change this in the 'Set up Node.js' step if needed.
+
+# Note on --access public:
+# If your npm package is public, you need to add `--access public` to the `npm publish` command.
+# If it's a private package scoped to an organization (e.g., @your-org/package-name),
+# you might not need `--access public`, but ensure your npm token has the correct permissions.
+# I've added `--access public` as a common default. Remove or adjust as needed.
+# If your package is scoped (e.g. @namespace/package-name), npm publish will handle it correctly.
+# Ensure your package.json "name" field reflects this if it's a scoped package.
+# Based on your package.json, the name is "hikma-pr", so it's not currently scoped.
+# If you intend to publish under an npm namespace/organization, update the "name" in package.json
+# to "@your-namespace/hikma-pr".
+# For example, if your npmjs namespace is "myorg", change it to "@myorg/hikma-pr".
+# The `npm publish` command will then publish it correctly under that scope.
+# The `--access public` flag is still relevant for scoped public packages.
+# If it's a private scoped package, you'd remove `--access public` and ensure your token has permissions
+# for private packages in that organization.
+# For now, I'm assuming it's a public, unscoped package or a public scoped package.
+# Please review the "name" in your package.json and the `--access public` flag.
