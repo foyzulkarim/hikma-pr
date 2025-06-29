@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ArrowLeft, ExternalLink, FileText, AlertTriangle, CheckCircle, TrendingUp, ChevronDown, ChevronRight, Plus, Minus } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
+import ReactMarkdown from 'react-markdown';
 import QualityScoreDisplay from "@/components/QualityScoreDisplay";
 import FindingCard from "@/components/FindingCard";
 import QualityRadarChart from "@/components/QualityRadarChart";
@@ -333,8 +334,10 @@ const ReviewDetail = () => {
                 <CardTitle className="text-lg sm:text-xl">AI Analysis Summary</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="prose max-w-none">
-                  <p className="text-slate-700 text-sm sm:text-base leading-relaxed">{review.semantic.summary}</p>
+                <div className="prose prose-slate max-w-none prose-sm sm:prose-base text-slate-700 leading-relaxed">
+                  <ReactMarkdown>
+                    {review.semantic.summary}
+                  </ReactMarkdown>
                 </div>
               </CardContent>
             </Card>
@@ -344,8 +347,10 @@ const ReviewDetail = () => {
                 <CardTitle className="text-lg sm:text-xl">Impact Assessment</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="prose max-w-none">
-                  <p className="text-slate-700 text-sm sm:text-base leading-relaxed">{review.semantic.impact}</p>
+                <div className="prose prose-slate max-w-none prose-sm sm:prose-base text-slate-700 leading-relaxed">
+                  <ReactMarkdown>
+                    {review.semantic.impact}
+                  </ReactMarkdown>
                 </div>
               </CardContent>
             </Card>
