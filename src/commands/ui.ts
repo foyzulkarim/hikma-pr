@@ -106,14 +106,14 @@ export async function startUIServer(options: { port?: number; open?: boolean } =
       resolve(); // Continue even if there's an error
     });
   });
-  
+
   console.log(chalk.green('🎉 Starting the web interface...'));
   console.log(chalk.cyan(`📱 Open your browser to: http://localhost:${port}`));
   console.log(chalk.gray('💡 Press Ctrl+C to stop the server'));
   console.log('');
   
-  // Start the Next.js development server
-  const devProcess = spawn('npm', ['exec', '--', 'next', 'dev'], {
+  // Start the simple Express server instead of Next.js
+  const devProcess = spawn('node', ['simple-server.js'], {
     cwd: guiPath,
     stdio: 'inherit',
     env
