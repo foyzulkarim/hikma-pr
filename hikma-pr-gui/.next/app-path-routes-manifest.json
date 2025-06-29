@@ -1,8 +1,0 @@
-{
-  "/_not-found/page": "/_not-found",
-  "/api/reviews/route": "/api/reviews",
-  "/api/reviews/[id]/route": "/api/reviews/[id]",
-  "/favicon.ico/route": "/favicon.ico",
-  "/review/[id]/page": "/review/[id]",
-  "/page": "/"
-}
