@@ -3,10 +3,21 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { generateReviewsData } = require('./data-generator');
 
+// Get the correct database path (same as your main app)
+function getDatabasePath() {
+  const homeDir = os.homedir();
+  const hikmaDir = path.join(homeDir, '.hikmapr');
+  return path.join(hikmaDir, 'reviews.db');
+}
+
 async function startUI(options = {}) {
-  const { port = 3000, dbPath = './hikma.db', skipDataGeneration = false } = options;
+  const { port = 3000, dbPath, skipDataGeneration = false } = options;
+  
+  // Use the correct database path if not provided
+  const actualDbPath = dbPath || getDatabasePath();
   
   console.log('🚀 Starting PR Analysis UI...');
   
@@ -22,7 +33,7 @@ async function startUI(options = {}) {
   if (!skipDataGeneration) {
     try {
       console.log('📊 Generating data from SQLite database...');
-      reviewsData = await generateReviewsData(dbPath);
+      reviewsData = await generateReviewsData(actualDbPath);
       console.log(`✅ Loaded ${reviewsData.reviews.length} reviews`);
     } catch (error) {
       console.warn('⚠️  Failed to load database:', error.message);

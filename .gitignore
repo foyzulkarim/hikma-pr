@@ -145,6 +145,12 @@ hikmapr.db
 # Prisma
 prisma/dev.db
 
+# UI Development Data - ignore exported JSON files but keep TypeScript files
+hikma-pr-ui/src/data/*.json
+hikma-pr-ui/src/data/*.md
+# Keep .ts files like mockData.ts
+!hikma-pr-ui/src/data/*.ts
+
 # Generated reports
 reports/
 # Keep examples directory but ignore temporary files

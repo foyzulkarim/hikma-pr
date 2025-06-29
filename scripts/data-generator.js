@@ -1,5 +1,14 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const os = require('os');
+
+// Import the database config to get the correct path
+function getDatabasePath() {
+  // This matches your existing getDatabasePath function
+  const homeDir = os.homedir();
+  const hikmaDir = path.join(homeDir, '.hikmapr');
+  return path.join(hikmaDir, 'reviews.db');
+}
 
 // Helper functions
 function extractPRTitle(prUrl) {
@@ -98,6 +107,41 @@ function calculateQualityMetrics(review) {
   return { security, performance, maintainability, standards };
 }
 
+function formatDate(dateValue) {
+  if (!dateValue) return 'Unknown';
+  
+  // Handle Unix timestamps (numbers)
+  if (typeof dateValue === 'number') {
+    const date = new Date(dateValue);
+    return date.toISOString().split('T')[0];
+  }
+  
+  // Handle different date formats from SQLite
+  if (typeof dateValue === 'string') {
+    // If it's already in YYYY-MM-DD format, return as is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+      return dateValue;
+    }
+    // If it's an ISO string, extract the date part
+    if (dateValue.includes('T')) {
+      return dateValue.split('T')[0];
+    }
+    // Try to parse as date
+    const parsed = new Date(dateValue);
+    if (!isNaN(parsed.getTime())) {
+      return parsed.toISOString().split('T')[0];
+    }
+  }
+  
+  // If it's a Date object
+  if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+    return dateValue.toISOString().split('T')[0];
+  }
+  
+  // Fallback
+  return 'Unknown';
+}
+
 function formatTime(timestamp) {
   if (!timestamp) return 'Unknown';
   return new Date(timestamp).toLocaleString();
@@ -118,7 +162,7 @@ function transformPrismaToUI(prismaReviews) {
       title: extractPRTitle(review.prUrl),
       repository: extractRepoName(review.prUrl),
       author: 'Unknown', // Not in current schema
-      date: review.createdAt.split('T')[0],
+      date: formatDate(review.createdAt),
       url: review.prUrl,
       status: review.completedAt ? 'completed' : (review.error ? 'failed' : 'in-progress'),
       qualityScore: calculateQualityScore(review),
@@ -150,7 +194,14 @@ function transformPrismaToUI(prismaReviews) {
   });
 }
 
-async function generateReviewsData(dbPath = './hikma.db') {
+async function generateReviewsData(dbPath) {
+  // Use the correct database path if not provided
+  if (!dbPath) {
+    dbPath = getDatabasePath();
+  }
+  
+  console.log(`📊 Using database: ${dbPath}`);
+  
   return new Promise((resolve, reject) => {
     const db = new sqlite3.Database(dbPath, (err) => {
       if (err) {
